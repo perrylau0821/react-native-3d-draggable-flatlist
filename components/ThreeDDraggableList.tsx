@@ -1,69 +1,70 @@
-import React, { useState, useCallback } from "react";
-import { View, TouchableOpacity, Text } from "react-native";
-import DraggableFlatList, { RenderItemParams } from "@/components/DraggableList";
+import React, {memo, useState} from 'react';
+import {ListRenderItemInfo, Pressable, StyleSheet, Text} from 'react-native';
 
-const NUM_ITEMS = 10;
+import ReorderableList, {
+  ReorderableListReorderEvent,
+  reorderItems,
+  useReorderableDrag,
+} from './react-native-reorderable-list';
 
-function getColor(i: number) {
-  const multiplier = 255 / (NUM_ITEMS - 1);
-  const colorVal = i * multiplier;
-  return `rgb(${colorVal}, ${Math.abs(128 - colorVal)}, ${255 - colorVal})`;
+interface CardProps {
+  id: string;
+  color: string;
+  height: number;
 }
 
-const exampleData: Item[] = [...Array(20)].map((d, index) => {
-  const backgroundColor = getColor(index);
-  return {
-    key: `item-${backgroundColor}`,
-    label: String(index),
-    backgroundColor
-  };
+const rand = () => Math.floor(Math.random() * 256);
+
+const seedData: CardProps[] = Array(20)
+  .fill(null)
+  .map((_, i) => ({
+    id: i.toString(),
+    color: `rgb(${rand()}, ${rand()}, ${rand()})`,
+    height: Math.max(60, Math.floor(Math.random() * 100)),
+  }));
+
+const Card: React.FC<CardProps> = memo(({id, color, height}) => {
+  const drag = useReorderableDrag();
+
+  return (
+    <Pressable style={[styles.card, {height}]} onLongPress={drag}>
+      <Text style={[styles.text, {color}]}>Card {id}</Text>
+    </Pressable>
+  );
 });
 
-type Item = {
-  key: string;
-  label: string;
-  backgroundColor: string;
-};
+const Example = () => {
+  const [data, setData] = useState(seedData);
 
-export function ThreeDDraggableList() {
-  const [data, setData] = useState(exampleData);
+  const handleReorder = ({from, to}: ReorderableListReorderEvent) => {
+    setData(value => reorderItems(value, from, to));
+  };
 
-  const renderItem = useCallback(
-    ({ item, index, drag, isActive }: RenderItemParams<Item>) => {
-      return (
-        <TouchableOpacity
-          style={{
-            height: 100,
-            backgroundColor: isActive ? "red" : item.backgroundColor,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-          onLongPress={drag}
-        >
-          <Text
-            style={{
-              fontWeight: "bold",
-              color: "white",
-              fontSize: 32,
-            }}
-          >
-            {item.label}
-          </Text>
-        </TouchableOpacity>
-      );
-    },
-    []
+  const renderItem = ({item}: ListRenderItemInfo<CardProps>) => (
+    <Card {...item} />
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      <DraggableFlatList
-        data={data}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => `draggable-item-${item.key}`}
-        onDragEnd={({ data }) => setData(data)}
-      />
-    </View>
+    <ReorderableList
+      data={data}
+      onReorder={handleReorder}
+      renderItem={renderItem}
+      keyExtractor={item => item.id}
+    />
   );
-}
+};
 
+const styles = StyleSheet.create({
+  card: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  text: {
+    fontSize: 20,
+  },
+});
+
+export default Example;
