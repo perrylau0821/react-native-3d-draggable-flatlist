@@ -1,5 +1,5 @@
-import { View, StyleSheet } from 'react-native';
-import { ThreeDDraggableList } from '@/components/ThreeDDraggableList';
+import { StyleSheet, View } from 'react-native';
+import ThreeDDraggableList from '@/components/ThreeDDraggableList';
 
 export default function Home() {
   return (
