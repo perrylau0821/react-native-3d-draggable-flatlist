@@ -12,21 +12,35 @@ interface Item {
   description: string;
 }
 
-const loremIpsum = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`;
+const loremIpsum = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.`;
 
 const getRandomDescription = () => {
   const words = loremIpsum.split(' ');
-  const length = Math.floor(Math.random() * 50) + 10; // Random length between 10 and 60 words
+  const length = Math.floor(Math.random() * 10) + 5; // Random length between 5 and 15 words
   return words.slice(0, length).join(' ');
 };
 
 const initialData: Item[] = [
-  { id: '1', title: 'Item 1', depth: 0, description: getRandomDescription() },
-  { id: '2', title: 'Subitem 1', depth: 1, description: getRandomDescription() },
-  { id: '3', title: 'Subitem 2', depth: 1, description: getRandomDescription() },
-  { id: '4', title: 'Item 2', depth: 0, description: getRandomDescription() },
-  { id: '5', title: 'Subitem 3', depth: 1, description: getRandomDescription() },
-  { id: '6', title: 'Deep item', depth: 2, description: getRandomDescription() },
+  { id: '1', title: 'Project Documentation', depth: 0, description: getRandomDescription() },
+  { id: '2', title: 'Getting Started Guide', depth: 1, description: getRandomDescription() },
+  { id: '3', title: 'Installation Steps', depth: 2, description: getRandomDescription() },
+  { id: '4', title: 'Configuration', depth: 2, description: getRandomDescription() },
+  { id: '5', title: 'API Reference', depth: 1, description: getRandomDescription() },
+  { id: '6', title: 'Endpoints', depth: 2, description: getRandomDescription() },
+  { id: '7', title: 'Authentication', depth: 2, description: getRandomDescription() },
+  { id: '8', title: 'Development Tools', depth: 0, description: getRandomDescription() },
+  { id: '9', title: 'Code Editor Setup', depth: 1, description: getRandomDescription() },
+  { id: '10', title: 'Extensions', depth: 2, description: getRandomDescription() },
+  { id: '11', title: 'Debug Tools', depth: 1, description: getRandomDescription() },
+  { id: '12', title: 'Project Structure', depth: 0, description: getRandomDescription() },
+  { id: '13', title: 'Core Components', depth: 1, description: getRandomDescription() },
+  { id: '14', title: 'UI Elements', depth: 2, description: getRandomDescription() },
+  { id: '15', title: 'State Management', depth: 1, description: getRandomDescription() },
+  { id: '16', title: 'Redux Setup', depth: 2, description: getRandomDescription() },
+  { id: '17', title: 'Testing', depth: 0, description: getRandomDescription() },
+  { id: '18', title: 'Unit Tests', depth: 1, description: getRandomDescription() },
+  { id: '19', title: 'Integration Tests', depth: 1, description: getRandomDescription() },
+  { id: '20', title: 'E2E Testing', depth: 1, description: getRandomDescription() },
 ];
 
 const ListItem = React.memo(({ item }: { item: Item }) => {
