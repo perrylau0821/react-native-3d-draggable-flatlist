@@ -2,7 +2,6 @@ import React, {useCallback, useMemo} from 'react';
 import {
   CellRendererProps,
   FlatList,
-  FlatListProps,
   Platform,
   ScrollView,
 } from 'react-native';
@@ -30,7 +29,6 @@ const AnimatedFlatList = Animated.createAnimatedComponent(
 ) => React.ReactElement;
 
 interface ReorderableListCoreProps<T> extends ReorderableListProps<T> {
-  // not optional but undefined to avoid forgetting to pass a prop
   scrollViewContainerRef: React.RefObject<ScrollView> | undefined;
   scrollViewHeightY: SharedValue<number> | undefined;
   scrollViewScrollOffsetY: SharedValue<number> | undefined;
@@ -66,6 +64,7 @@ const ReorderableListCore = <T,>(
     shouldUpdateActiveItem,
     panEnabled = true,
     panActivateAfterLongPress,
+    depthExtractor,
     ...rest
   }: ReorderableListCoreProps<T>,
   ref: React.ForwardedRef<FlatList<T>>,
@@ -99,8 +98,6 @@ const ReorderableListCore = <T,>(
     scrollViewHeightY,
     scrollViewScrollOffsetY,
     scrollViewScrollEnabled,
-    // flatlist will default to true if we pass explicitly undefined,
-    // but internally we would treat it as false, so we force true
     initialScrollEnabled:
       typeof rest.scrollEnabled === 'undefined' ? true : rest.scrollEnabled,
     initialScrollViewScrollEnabled:
@@ -112,14 +109,13 @@ const ReorderableListCore = <T,>(
     shouldUpdateActiveItem,
     panEnabled,
     panActivateAfterLongPress,
+    depthExtractor,
   });
 
   const combinedGesture = useMemo(() => {
-    // android is able to handle nested scroll view, but not the full height ones like iOS
     if (outerScrollGesture && !(Platform.OS === 'android' && scrollable)) {
       return Gesture.Simultaneous(outerScrollGesture, gestureHandler);
     }
-
     return gestureHandler;
   }, [scrollable, outerScrollGesture, gestureHandler]);
 
@@ -129,10 +125,10 @@ const ReorderableListCore = <T,>(
   ]);
 
   const renderAnimatedCell = useCallback(
-    ({cellKey, ...props}: CellRendererProps<T>) => (
+    ({item, cellKey, ...props}: CellRendererProps<T>) => (
       <ReorderableListCell
         {...props}
-        // forces remount with key change on reorder
+        item={item}
         key={`${cellKey}+${props.index}`}
         itemOffset={itemOffset}
         itemHeight={itemHeight}

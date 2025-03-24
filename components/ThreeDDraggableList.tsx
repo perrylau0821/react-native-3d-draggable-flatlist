@@ -1,70 +1,75 @@
-import React, {memo, useState} from 'react';
-import {ListRenderItemInfo, Pressable, StyleSheet, Text} from 'react-native';
-
+// components/ThreeDDraggableList.tsx
+import React, { useState } from 'react';
+import { StyleSheet, Text, Pressable, View } from 'react-native';
 import ReorderableList, {
   ReorderableListReorderEvent,
-  reorderItems,
   useReorderableDrag,
 } from './react-native-reorderable-list';
 
-interface CardProps {
+interface Item {
   id: string;
-  color: string;
-  height: number;
+  title: string;
+  depth: number;
 }
 
-const rand = () => Math.floor(Math.random() * 256);
+const initialData: Item[] = [
+  { id: '1', title: 'Item 1', depth: 0 },
+  { id: '2', title: 'Subitem 1', depth: 1 },
+  { id: '3', title: 'Subitem 2', depth: 1 },
+  { id: '4', title: 'Item 2', depth: 0 },
+  { id: '5', title: 'Subitem 3', depth: 1 },
+  { id: '6', title: 'Deep item', depth: 2 },
+];
 
-const seedData: CardProps[] = Array(20)
-  .fill(null)
-  .map((_, i) => ({
-    id: i.toString(),
-    color: `rgb(${rand()}, ${rand()}, ${rand()})`,
-    height: Math.max(60, Math.floor(Math.random() * 100)),
-  }));
-
-const Card: React.FC<CardProps> = memo(({id, color, height}) => {
+const ListItem = React.memo(({ item }: { item: Item }) => {
   const drag = useReorderableDrag();
 
   return (
-    <Pressable style={[styles.card, {height}]} onLongPress={drag}>
-      <Text style={[styles.text, {color}]}>Card {id}</Text>
+    <Pressable onLongPress={drag} style={styles.item}>
+      <Text style={styles.text}>
+        {item.depth === 0 ? '📁' : item.depth === 1 ? '📄' : '📎'} {item.title}
+      </Text>
     </Pressable>
   );
 });
 
-const Example = () => {
-  const [data, setData] = useState(seedData);
+export default function ThreeDDraggableList() {
+  const [data, setData] = useState(initialData);
 
-  const handleReorder = ({from, to}: ReorderableListReorderEvent) => {
-    setData(value => reorderItems(value, from, to));
+  const handleReorder = ({ from, to }: ReorderableListReorderEvent) => {
+    setData(current => {
+      const newData = [...current];
+      const [removed] = newData.splice(from, 1);
+      newData.splice(to, 0, removed);
+      return newData;
+    });
   };
 
-  const renderItem = ({item}: ListRenderItemInfo<CardProps>) => (
-    <Card {...item} />
-  );
-
   return (
-    <ReorderableList
-      data={data}
-      onReorder={handleReorder}
-      renderItem={renderItem}
-      keyExtractor={item => item.id}
-    />
+    <View style={styles.container}>
+      <ReorderableList
+        data={data}
+        onReorder={handleReorder}
+        renderItem={({ item }) => <ListItem item={item} />}
+        keyExtractor={item => item.id}
+        depthExtractor={item => item.depth}
+      />
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  card: {
-    justifyContent: 'center',
-    alignItems: 'center',
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  item: {
     backgroundColor: 'white',
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: '#eee',
   },
   text: {
-    fontSize: 20,
-  },
+    fontSize: 16,
+  }
 });
-
-export default Example;

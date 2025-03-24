@@ -69,6 +69,11 @@ export interface ReorderableListProps<T>
   extends Omit<FlatListProps<T>, OmittedProps> {
   data: T[];
   /**
+   * Function to extract the depth/level of an item in the list.
+   * This is used to determine the hierarchical structure of the list.
+   */
+  depthExtractor?: (item: T) => number;
+  /**
    * Threshold at the extremety of the list which triggers autoscroll when an item is dragged to it.
    * A value of 0.1 means that 10% of the area at the top and 10% at the bottom of the list will trigger autoscroll
    * when an item is dragged to it. Min value: `0`. Max value: `0.4`. Default: `0.1`.

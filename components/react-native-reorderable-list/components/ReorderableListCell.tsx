@@ -24,6 +24,7 @@ interface ReorderableListCellProps<T>
   dragY: SharedValue<number>;
   draggedIndex: SharedValue<number>;
   animationDuration: SharedValue<number>;
+  item: T;
 }
 
 export const ReorderableListCell = memo(
@@ -37,8 +38,10 @@ export const ReorderableListCell = memo(
     dragY,
     draggedIndex,
     animationDuration,
+    item,
+  
   }: ReorderableListCellProps<T>) => {
-    const {currentIndex, draggedHeight, activeIndex, cellAnimations} =
+    const {currentIndex, draggedHeight, activeIndex, cellAnimations ,  depthExtractor} =
       useContext(ReorderableListContext);
     const dragHandler = useCallback(
       () => runOnUI(startDrag)(index),
@@ -55,6 +58,11 @@ export const ReorderableListCell = memo(
       }),
       [index, dragHandler, draggedIndex, isActive],
     );
+
+     // Calculate indentation based on depth
+    const depth = depthExtractor ? depthExtractor(item) : 0;
+    console.log(depthExtractor)
+    const indentation = depth * 24; // 24px per level of depth
 
     // Keep separate animated reactions that update itemTranslateY
     // otherwise animations might stutter if multiple are triggered
@@ -116,6 +124,7 @@ export const ReorderableListCell = memo(
           {
             transform,
             zIndex: 999,
+            paddingLeft: indentation
           },
           cellAnimations,
           ['transform'],
@@ -127,6 +136,7 @@ export const ReorderableListCell = memo(
         // TODO: move to stylesheet when this is fixed
         // https://github.com/software-mansion/react-native-reanimated/issues/6681#issuecomment-2514228447
         zIndex: 0,
+        paddingLeft: indentation
       };
     });
 

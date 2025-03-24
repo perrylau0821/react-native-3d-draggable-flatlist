@@ -70,6 +70,7 @@ interface UseReorderableListCoreArgs<T> {
   shouldUpdateActiveItem: boolean | undefined;
   panEnabled: boolean;
   panActivateAfterLongPress: number | undefined;
+  depthExtractor?: (item: T) => number;
 }
 
 export const useReorderableListCore = <T>({
@@ -96,6 +97,7 @@ export const useReorderableListCore = <T>({
   shouldUpdateActiveItem,
   panActivateAfterLongPress,
   panEnabled,
+  depthExtractor
 }: UseReorderableListCoreArgs<T>) => {
   const flatListRef = useAnimatedRef<FlatList>();
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -159,6 +161,7 @@ export const useReorderableListCore = <T>({
             ? cellAnimations.opacity
             : opacityDefault,
       },
+      depthExtractor
     }),
     [
       draggedHeight,
@@ -169,6 +172,7 @@ export const useReorderableListCore = <T>({
       cellAnimations,
       scaleDefault,
       opacityDefault,
+      depthExtractor
     ],
   );
 

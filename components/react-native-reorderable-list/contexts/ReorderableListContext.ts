@@ -10,6 +10,7 @@ interface ReorderableListContextData {
   dragEndHandlers: SharedValue<((from: number, to: number) => void)[][]>;
   activeIndex: number;
   cellAnimations: ReorderableListCellAnimations;
+  depthExtractor?: (item: any) => number;
 }
 
 export const ReorderableListContext = React.createContext<
