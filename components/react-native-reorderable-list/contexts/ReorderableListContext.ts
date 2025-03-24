@@ -11,6 +11,7 @@ interface ReorderableListContextData {
   activeIndex: number;
   cellAnimations: ReorderableListCellAnimations;
   depthExtractor?: (item: any) => number;
+   data: any[];
 }
 
 export const ReorderableListContext = React.createContext<

@@ -129,6 +129,7 @@ const ReorderableListCore = <T,>(
       <ReorderableListCell
         {...props}
         item={item}
+        data={rest.data}
         key={`${cellKey}+${props.index}`}
         itemOffset={itemOffset}
         itemHeight={itemHeight}

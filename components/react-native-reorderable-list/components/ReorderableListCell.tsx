@@ -1,9 +1,10 @@
-import React, {memo, useCallback, useMemo} from 'react';
-import {CellRendererProps, LayoutChangeEvent} from 'react-native';
+import React, { memo, useCallback, useMemo } from 'react';
+import { CellRendererProps, LayoutChangeEvent } from 'react-native';
 
 import Animated, {
   Easing,
   SharedValue,
+  runOnJS,
   runOnUI,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -12,9 +13,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import {ReorderableCellContext, ReorderableListContext} from '../contexts';
-import {useContext} from '../hooks';
-import {applyAnimatedStyles} from './helpers';
+import { ReorderableCellContext, ReorderableListContext } from '../contexts';
+import { useContext } from '../hooks';
+import { applyAnimatedStyles } from './helpers';
 
 interface ReorderableListCellProps<T>
   extends Omit<CellRendererProps<T>, 'cellKey'> {
@@ -25,10 +26,13 @@ interface ReorderableListCellProps<T>
   draggedIndex: SharedValue<number>;
   animationDuration: SharedValue<number>;
   item: T;
+  data: T[];
 }
 
-export const ReorderableListCell = memo(
-  <T,>({
+export const ReorderableListCell = memo(function ReorderableListCell<T>(
+  props: ReorderableListCellProps<T>
+) {
+  const {
     index,
     startDrag,
     children,
@@ -39,122 +43,121 @@ export const ReorderableListCell = memo(
     draggedIndex,
     animationDuration,
     item,
-  
-  }: ReorderableListCellProps<T>) => {
-    const {currentIndex, draggedHeight, activeIndex, cellAnimations ,  depthExtractor} =
-      useContext(ReorderableListContext);
-    const dragHandler = useCallback(
-      () => runOnUI(startDrag)(index),
-      [startDrag, index],
-    );
+    data
+  } = props;
 
-    const isActive = activeIndex === index;
-    const contextValue = useMemo(
-      () => ({
-        index,
-        dragHandler,
-        draggedIndex,
-        isActive,
-      }),
-      [index, dragHandler, draggedIndex, isActive],
-    );
+  const { currentIndex, draggedHeight, activeIndex, cellAnimations, depthExtractor, data: contextData } =
+    useContext(ReorderableListContext);
+    
+  const dragHandler = useCallback(
+    () => runOnUI(startDrag)(index),
+    [startDrag, index],
+  );
 
-     // Calculate indentation based on depth
-    const depth = depthExtractor ? depthExtractor(item) : 0;
-    console.log(depthExtractor)
-    const indentation = depth * 24; // 24px per level of depth
+  const isActive = activeIndex === index;
+  const contextValue = useMemo(
+    () => ({
+      index,
+      dragHandler,
+      draggedIndex,
+      isActive,
+    }),
+    [index, dragHandler, draggedIndex, isActive],
+  );
 
-    // Keep separate animated reactions that update itemTranslateY
-    // otherwise animations might stutter if multiple are triggered
-    // (even in other cells, e.g. released item and reordering cells)
-    const itemTranslateY = useSharedValue(0);
-    const isActiveCell = useDerivedValue(() => draggedIndex.value === index);
+  // Calculate indentation based on depth
+  const depth = depthExtractor ? depthExtractor(item) : 0;
+  const indentation = depth * 24;
+  console.log(data)
 
-    useAnimatedReaction(
-      () => dragY.value,
-      () => {
-        if (
-          index === draggedIndex.value &&
-          currentIndex.value >= 0 &&
-          draggedIndex.value >= 0
-        ) {
-          itemTranslateY.value = dragY.value;
-        }
-      },
-    );
+  // Keep separate animated reactions that update itemTranslateY
+  // otherwise animations might stutter if multiple are triggered
+  // (even in other cells, e.g. released item and reordering cells)
+  const itemTranslateY = useSharedValue(0);
+  const isActiveCell = useDerivedValue(() => draggedIndex.value === index);
 
-    useAnimatedReaction(
-      () => currentIndex.value,
-      () => {
-        if (
-          index !== draggedIndex.value &&
-          currentIndex.value >= 0 &&
-          draggedIndex.value >= 0
-        ) {
-          const moveUp = currentIndex.value > draggedIndex.value;
-          const startMove = Math.min(draggedIndex.value, currentIndex.value);
-          const endMove = Math.max(draggedIndex.value, currentIndex.value);
+  useAnimatedReaction(
+    () => dragY.value,
+    () => {
+      if (
+        index === draggedIndex.value &&
+        currentIndex.value >= 0 &&
+        draggedIndex.value >= 0
+      ) {
+        itemTranslateY.value = dragY.value;
+      }
+    },
+  );
 
-          let newValue = 0;
-          if (index >= startMove && index <= endMove) {
-            newValue = moveUp ? -draggedHeight.value : draggedHeight.value;
-          }
+  useAnimatedReaction(
+    () => currentIndex.value,
+    () => {
+      if (
+        index !== draggedIndex.value &&
+        currentIndex.value >= 0 &&
+        draggedIndex.value >= 0
+      ) {
+        const moveUp = currentIndex.value > draggedIndex.value;
+        const startMove = Math.min(draggedIndex.value, currentIndex.value);
+        const endMove = Math.max(draggedIndex.value, currentIndex.value);
 
-          if (newValue !== itemTranslateY.value) {
-            itemTranslateY.value = withTiming(newValue, {
-              duration: animationDuration.value,
-              easing: Easing.out(Easing.ease),
-            });
-          }
-        }
-      },
-    );
-
-    const animatedStyle = useAnimatedStyle(() => {
-      if (isActiveCell.value) {
-        const transform = [{translateY: itemTranslateY.value}];
-        if (Array.isArray(cellAnimations.transform)) {
-          const customTransform = cellAnimations.transform.map(x =>
-            applyAnimatedStyles({}, x),
-          ) as [];
-          transform.push(...customTransform);
+        let newValue = 0;
+        if (index >= startMove && index <= endMove) {
+          newValue = moveUp ? -draggedHeight.value : draggedHeight.value;
         }
 
-        return applyAnimatedStyles(
-          {
-            transform,
-            zIndex: 999,
-            paddingLeft: indentation
-          },
-          cellAnimations,
-          ['transform'],
-        );
+        if (newValue !== itemTranslateY.value) {
+          itemTranslateY.value = withTiming(newValue, {
+            duration: animationDuration.value,
+            easing: Easing.out(Easing.ease),
+          });
+        }
+      }
+    },
+  );
+
+  const animatedStyle = useAnimatedStyle(() => {
+    if (isActiveCell.value) {
+      const transform = [{translateY: itemTranslateY.value}];
+      if (Array.isArray(cellAnimations.transform)) {
+        const customTransform = cellAnimations.transform.map(x =>
+          applyAnimatedStyles({}, x),
+        ) as [];
+        transform.push(...customTransform);
       }
 
-      return {
-        transform: [{translateY: itemTranslateY.value}],
-        // TODO: move to stylesheet when this is fixed
-        // https://github.com/software-mansion/react-native-reanimated/issues/6681#issuecomment-2514228447
-        zIndex: 0,
-        paddingLeft: indentation
-      };
-    });
+      return applyAnimatedStyles(
+        {
+          transform,
+          zIndex: 999,
+          paddingLeft: indentation
+        },
+        cellAnimations,
+        ['transform'],
+      );
+    }
 
-    const handleLayout = (e: LayoutChangeEvent) => {
-      runOnUI((y: number, height: number) => {
-        itemOffset.value[index] = y;
-        itemHeight.value[index] = height;
-      })(e.nativeEvent.layout.y, e.nativeEvent.layout.height);
-
-      onLayout?.(e);
+    return {
+      transform: [{translateY: itemTranslateY.value}],
+      zIndex: 0,
+      paddingLeft: indentation
     };
+  });
 
-    return (
-      <ReorderableCellContext.Provider value={contextValue}>
-        <Animated.View style={animatedStyle} onLayout={handleLayout}>
-          {children}
-        </Animated.View>
-      </ReorderableCellContext.Provider>
-    );
-  },
-);
+  const handleLayout = (e: LayoutChangeEvent) => {
+    runOnUI((y: number, height: number) => {
+      itemOffset.value[index] = y;
+      itemHeight.value[index] = height;
+    })(e.nativeEvent.layout.y, e.nativeEvent.layout.height);
+
+    onLayout?.(e);
+  };
+
+  return (
+    <ReorderableCellContext.Provider value={contextValue}>
+      <Animated.View style={animatedStyle} onLayout={handleLayout}>
+        {children}
+      </Animated.View>
+    </ReorderableCellContext.Provider>
+  );
+});

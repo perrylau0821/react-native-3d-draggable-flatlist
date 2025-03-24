@@ -71,6 +71,7 @@ interface UseReorderableListCoreArgs<T> {
   panEnabled: boolean;
   panActivateAfterLongPress: number | undefined;
   depthExtractor?: (item: T) => number;
+  data: T[];
 }
 
 export const useReorderableListCore = <T>({
@@ -97,7 +98,8 @@ export const useReorderableListCore = <T>({
   shouldUpdateActiveItem,
   panActivateAfterLongPress,
   panEnabled,
-  depthExtractor
+  depthExtractor,
+  data
 }: UseReorderableListCoreArgs<T>) => {
   const flatListRef = useAnimatedRef<FlatList>();
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -110,13 +112,9 @@ export const useReorderableListCore = <T>({
   const flatListScrollOffsetY = useSharedValue(0);
   const flatListHeightY = useSharedValue(0);
   const nestedFlatListPositionY = useSharedValue(0);
-  // The scroll y translation of the list since drag start
   const dragScrollTranslationY = useSharedValue(0);
-  // The initial scroll offset y of the list on drag start
   const dragInitialScrollOffsetY = useSharedValue(0);
-  // The scroll y translation of the ScrollViewContainer since drag start
   const scrollViewDragScrollTranslationY = useSharedValue(0);
-  // The initial scroll offset y of the ScrollViewContainer on drag start
   const scrollViewDragInitialScrollOffsetY = useSharedValue(0);
   const draggedHeight = useSharedValue(0);
   const itemOffset = useSharedValue<number[]>([]);
@@ -161,7 +159,8 @@ export const useReorderableListCore = <T>({
             ? cellAnimations.opacity
             : opacityDefault,
       },
-      depthExtractor
+      depthExtractor,
+      data
     }),
     [
       draggedHeight,
@@ -172,17 +171,11 @@ export const useReorderableListCore = <T>({
       cellAnimations,
       scaleDefault,
       opacityDefault,
-      depthExtractor
+      depthExtractor,
+      data
     ],
   );
 
-  /**
-   * Decides the intended drag direction of the user.
-   * This is used to to determine if the user intends to autoscroll
-   * when within the threshold area.
-   *
-   * @param e - The payload of the pan gesture update event.
-   */
   const setDragDirection = useCallback(
     (e: GestureUpdateEvent<PanGestureHandlerEventPayload>) => {
       'worklet';
@@ -210,7 +203,6 @@ export const useReorderableListCore = <T>({
       if (currentItemDragCenterY.value === null) {
         if (currentIndex.value >= 0) {
           const itemCenter = itemHeight.value[currentIndex.value] * 0.5;
-          // the y coordinate of the item relative to the list
           const itemY =
             itemOffset.value[currentIndex.value] -
             (flatListScrollOffsetY.value +
@@ -240,7 +232,6 @@ export const useReorderableListCore = <T>({
     () =>
       Gesture.Pan()
         .onBegin(e => {
-          // prevent new dragging until item is completely released
           if (state.value === ReorderableListState.IDLE) {
             startY.value = e.y;
             currentY.value = e.y;
@@ -301,7 +292,6 @@ export const useReorderableListCore = <T>({
 
   const setScrollEnabled = useCallback(
     (enabled: boolean) => {
-      // if scroll is enabled on list props then we can toggle it
       if (initialScrollEnabled) {
         scrollEnabled.value = enabled;
         flatListRef.current?.setNativeProps({scrollEnabled: enabled});
@@ -394,13 +384,6 @@ export const useReorderableListCore = <T>({
     [itemOffset, itemHeight],
   );
 
-  /**
-   * Computes a potential new drop container for the current dragged item and evaluates
-   * whether the dragged item center is nearer to the center of the current container or the new one.
-   *
-   * @returns The new index if the center of the dragged item is closer to the center of
-   * the new drop container or the current index if closer to the current drop container.
-   */
   const computeCurrentIndex = useCallback(() => {
     'worklet';
 
@@ -408,7 +391,6 @@ export const useReorderableListCore = <T>({
       return currentIndex.value;
     }
 
-    // apply scroll offset and scroll container translation
     const relativeDragCenterY =
       flatListScrollOffsetY.value +
       scrollViewDragScrollTranslationY.value +
@@ -468,13 +450,11 @@ export const useReorderableListCore = <T>({
     (type: 'start' | 'end') => {
       'worklet';
 
-      // if no custom scale run default
       if (!(cellAnimations && 'transform' in cellAnimations)) {
         const scaleConfig = SCALE_ANIMATION_CONFIG_DEFAULT[type];
         scaleDefault.value = withTiming(scaleConfig.toValue, scaleConfig);
       }
 
-      // if no custom opacity run the default
       if (!(cellAnimations && 'opacity' in cellAnimations)) {
         const opacityConfig = OPACITY_ANIMATION_CONFIG_DEFAULT[type];
         opacityDefault.value = withTiming(opacityConfig.toValue, opacityConfig);
@@ -494,14 +474,12 @@ export const useReorderableListCore = <T>({
       ) {
         state.value = ReorderableListState.RELEASED;
 
-        // enable back scroll on releasing
         runOnJS(setScrollEnabled)(true);
 
         if (shouldUpdateActiveItem) {
           runOnJS(setActiveIndex)(-1);
         }
 
-        // trigger onDragEnd event
         let e = {from: draggedIndex.value, to: currentIndex.value};
         onDragEnd?.(e);
 
@@ -510,7 +488,6 @@ export const useReorderableListCore = <T>({
           handlers.forEach(fn => fn(e.from, e.to));
         }
 
-        // they are actually swapped on drag translation
         const currentItemOffset = itemOffset.value[draggedIndex.value];
         const currentItemHeight = itemHeight.value[draggedIndex.value];
         const draggedItemOffset = itemOffset.value[currentIndex.value];
@@ -526,7 +503,6 @@ export const useReorderableListCore = <T>({
         runDefaultDragAnimations('end');
 
         if (dragY.value !== newTopPosition) {
-          // animate dragged item to its new position on release
           dragY.value = withTiming(
             newTopPosition,
             {
@@ -538,9 +514,6 @@ export const useReorderableListCore = <T>({
             },
           );
         } else {
-          // user might drag and release the item without moving it so,
-          // since the animation end callback is not executed in that case
-          // we need to reset values as the reorder function would do
           runOnJS(resetSharedValuesAfterAnimations)();
         }
       }
@@ -553,7 +526,6 @@ export const useReorderableListCore = <T>({
       return {top: 0, bottom: 0};
     }
 
-    // hidden area cannot be negative
     const top = Math.max(
       0,
       scrollViewScrollOffsetY.value - nestedFlatListPositionY.value,
@@ -604,8 +576,6 @@ export const useReorderableListCore = <T>({
       const top = area + offsetTop;
       const bottom = flatListHeightY.value - area - offsetBottom;
 
-      // if the hidden area is 0 then we don't have a threshold area
-      // we might have floating errors like 0.0001 which we should ignore
       return {
         top: hiddenArea.top > 0.1 ? top + hiddenArea.top : 0,
         bottom: hiddenArea.bottom > 0.1 ? bottom - hiddenArea.bottom : 0,
@@ -620,7 +590,6 @@ export const useReorderableListCore = <T>({
       const hiddenArea = calculateHiddenArea();
       const thresholdAreaParent = calculateThresholdAreaParent(hiddenArea);
 
-      // we might have floating errors like 0.0001 which we should ignore
       return (
         (hiddenArea.top > 0.1 && y <= thresholdAreaParent.top) ||
         (hiddenArea.bottom > 0.1 && y >= thresholdAreaParent.bottom)
@@ -676,12 +645,7 @@ export const useReorderableListCore = <T>({
       ) {
         setCurrentIndex();
 
-        // Trigger autoscroll when:
-        // 1. Within the threshold area (top or bottom of list)
-        // 2. Have dragged in the same direction as the scroll
-        // 3. Not already in autoscroll mode
         if (dragDirection.value === scrollDirection(y)) {
-          // When the first two conditions are met and it's already in autoscroll mode, we let it continue (no-op)
           if (state.value !== ReorderableListState.AUTOSCROLL) {
             state.value = ReorderableListState.AUTOSCROLL;
             lastAutoscrollTrigger.value = autoscrollTrigger.value;
@@ -721,20 +685,14 @@ export const useReorderableListCore = <T>({
           scrollTo(listRef, 0, scrollOffset + autoscrollIncrement, true);
         }
 
-        // when autoscrolling user may not be moving his finger so we need
-        // to update the current position of the dragged item here
         setCurrentIndex();
       }
     },
   );
 
-  // flatlist scroll handler
   const handleScroll = useAnimatedScrollHandler(e => {
     flatListScrollOffsetY.value = e.contentOffset.y;
 
-    // checking if the list is not scrollable instead of the scrolling state
-    // fixes a bug on iOS where the item is shifted after autoscrolling and then
-    // moving away from autoscroll area
     if (!scrollEnabled.value) {
       dragScrollTranslationY.value =
         flatListScrollOffsetY.value - dragInitialScrollOffsetY.value;
@@ -754,13 +712,10 @@ export const useReorderableListCore = <T>({
     }
   });
 
-  // parent scroll handler
   useAnimatedReaction(
     () => scrollViewScrollOffsetY?.value,
     value => {
       if (value && scrollViewScrollEnabled) {
-        // checking if the list is not scrollable instead of the scrolling state
-        // fixes a bug on iOS where the item is shifted after autoscrolling and moving away from the area
         if (!scrollViewScrollEnabled.value) {
           scrollViewDragScrollTranslationY.value =
             value - scrollViewDragInitialScrollOffsetY.value;
@@ -784,10 +739,7 @@ export const useReorderableListCore = <T>({
     (index: number) => {
       'worklet';
 
-      // allow new drag when item is completely released
       if (state.value === ReorderableListState.IDLE) {
-        // resetting shared values again fixes a flickeing bug in nested lists where
-        // after scrolling the parent list it would offset the new dragged item in another nested list
         resetSharedValues();
 
         if (shouldUpdateActiveItem) {
@@ -805,7 +757,6 @@ export const useReorderableListCore = <T>({
 
         runOnJS(setScrollEnabled)(false);
 
-        // run animation before onDragStart to avoid potentially waiting for it
         runDefaultDragAnimations('start');
         onDragStart?.({index});
       }
