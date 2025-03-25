@@ -2,9 +2,11 @@ import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   FlatList,
   LayoutChangeEvent,
+  Platform,
   ScrollView,
   unstable_batchedUpdates,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import {
   Gesture,
@@ -73,6 +75,18 @@ interface UseReorderableListCoreArgs<T> {
   depthExtractor?: (item: T) => number;
   data: T[];
 }
+
+const triggerHaptic = () => {
+  if (Platform.OS !== 'web') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  }
+};
+
+const triggerSelectionHaptic = () => {
+  if (Platform.OS !== 'web') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }
+};
 
 export const useReorderableListCore = <T>({
   ref,
@@ -441,6 +455,9 @@ export const useReorderableListCore = <T>({
     if (currentIndex.value !== newIndex) {
       recomputeLayout(currentIndex.value, newIndex);
       currentIndex.value = newIndex;
+      
+      // Add haptic feedback when index changes
+      runOnJS(triggerSelectionHaptic)();
 
       onIndexChange?.({index: newIndex});
     }
@@ -745,6 +762,9 @@ export const useReorderableListCore = <T>({
         if (shouldUpdateActiveItem) {
           runOnJS(setActiveIndex)(index);
         }
+
+        // Add haptic feedback when item becomes active
+        runOnJS(triggerHaptic)();
 
         dragInitialScrollOffsetY.value = flatListScrollOffsetY.value;
         scrollViewDragInitialScrollOffsetY.value =
