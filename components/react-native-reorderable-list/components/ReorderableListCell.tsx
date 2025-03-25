@@ -24,6 +24,7 @@ interface ReorderableListCellProps<T>
   itemHeight: SharedValue<number[]>;
   dragY: SharedValue<number>;
   draggedIndex: SharedValue<number>;
+  draggedIndices: SharedValue<number[]>;
   animationDuration: SharedValue<number>;
   item: T;
   data: T[];
@@ -41,12 +42,13 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     itemHeight,
     dragY,
     draggedIndex,
+    draggedIndices,
     animationDuration,
     item,
     data
   } = props;
 
-  const { currentIndex, draggedHeight, activeIndex, cellAnimations, depthExtractor, data: contextData } =
+  const { currentIndex, currentIndices, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
     useContext(ReorderableListContext);
     
   const dragHandler = useCallback(
@@ -55,36 +57,41 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   );
 
   const isActive = activeIndex === index;
+  const isActiveChildren = activeIndices.includes(index) && !isActive;
   const contextValue = useMemo(
     () => ({
       index,
       dragHandler,
       draggedIndex,
+      draggedIndices,
       isActive,
+      isActiveChildren
     }),
-    [index, dragHandler, draggedIndex, isActive],
+    [index, dragHandler, draggedIndex, draggedIndices, isActive, isActiveChildren],
   );
 
   // Calculate indentation based on depth
   const depth = depthExtractor ? depthExtractor(item) : 0;
   const indentation = depth * 24;
-  console.log(data)
+ 
 
   // Keep separate animated reactions that update itemTranslateY
   // otherwise animations might stutter if multiple are triggered
   // (even in other cells, e.g. released item and reordering cells)
   const itemTranslateY = useSharedValue(0);
   const isActiveCell = useDerivedValue(() => draggedIndex.value === index);
+  const isActiveCells = useDerivedValue(() => draggedIndices.value.includes(index))
 
   useAnimatedReaction(
     () => dragY.value,
     () => {
       if (
-        index === draggedIndex.value &&
+        // index === draggedIndex.value &&
+        draggedIndices.value.includes(index) &&
         currentIndex.value >= 0 &&
         draggedIndex.value >= 0
       ) {
-        itemTranslateY.value = dragY.value;
+        itemTranslateY.value = dragY.value 
       }
     },
   );
@@ -93,15 +100,18 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     () => currentIndex.value,
     () => {
       if (
-        index !== draggedIndex.value &&
+        !draggedIndices.value.includes(index) &&
         currentIndex.value >= 0 &&
         draggedIndex.value >= 0
       ) {
+        const childrenLength = draggedIndices.value.length-1
+        
         const moveUp = currentIndex.value > draggedIndex.value;
         const startMove = Math.min(draggedIndex.value, currentIndex.value);
-        const endMove = Math.max(draggedIndex.value, currentIndex.value);
+        const endMove = Math.max(draggedIndex.value + childrenLength, currentIndex.value + childrenLength);
 
         let newValue = 0;
+       
         if (index >= startMove && index <= endMove) {
           newValue = moveUp ? -draggedHeight.value : draggedHeight.value;
         }

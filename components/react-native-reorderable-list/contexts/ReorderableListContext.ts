@@ -9,6 +9,7 @@ interface ReorderableListContextData {
   draggedHeight: SharedValue<number>;
   dragEndHandlers: SharedValue<((from: number, to: number) => void)[][]>;
   activeIndex: number;
+  activeIndicies: number[];
   cellAnimations: ReorderableListCellAnimations;
   depthExtractor?: (item: any) => number;
    data: any[];

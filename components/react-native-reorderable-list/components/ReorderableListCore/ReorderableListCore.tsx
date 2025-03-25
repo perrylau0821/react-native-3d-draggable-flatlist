@@ -80,6 +80,7 @@ const ReorderableListCore = <T,>(
     itemHeight,
     dragY,
     draggedIndex,
+    draggedIndices,
     duration,
   } = useReorderableListCore({
     ref,
@@ -110,6 +111,7 @@ const ReorderableListCore = <T,>(
     panEnabled,
     panActivateAfterLongPress,
     depthExtractor,
+    data:rest.data
   });
 
   const combinedGesture = useMemo(() => {
@@ -135,11 +137,12 @@ const ReorderableListCore = <T,>(
         itemHeight={itemHeight}
         dragY={dragY}
         draggedIndex={draggedIndex}
+        draggedIndices={draggedIndices}
         animationDuration={duration}
         startDrag={startDrag}
       />
     ),
-    [itemOffset, itemHeight, dragY, draggedIndex, duration, startDrag],
+    [itemOffset, itemHeight, dragY, draggedIndex, draggedIndices, duration, startDrag],
   );
 
   return (

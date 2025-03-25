@@ -117,6 +117,7 @@ export const useReorderableListCore = <T>({
 }: UseReorderableListCoreArgs<T>) => {
   const flatListRef = useAnimatedRef<FlatList>();
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [activeIndices, setActiveIndices] = useState([])
   const scrollEnabled = useSharedValue(initialScrollEnabled);
   const gestureState = useSharedValue<State>(State.UNDETERMINED);
   const currentY = useSharedValue(0);
@@ -136,8 +137,11 @@ export const useReorderableListCore = <T>({
   const autoscrollTrigger = useSharedValue(-1);
   const lastAutoscrollTrigger = useSharedValue(-1);
   const dragY = useSharedValue(0);
+  const dragYOffsets = useSharedValue<number[]>([]); 
   const currentIndex = useSharedValue(-1);
+  const currentIndices = useSharedValue<number[]>([]); 
   const draggedIndex = useSharedValue(-1);
+  const draggedIndices = useSharedValue<number[]>([]);
   const state = useSharedValue<ReorderableListState>(ReorderableListState.IDLE);
   const dragEndHandlers = useSharedValue<
     ((from: number, to: number) => void)[][]
@@ -159,9 +163,12 @@ export const useReorderableListCore = <T>({
     () => ({
       draggedHeight,
       currentIndex,
+      currentIndices,
       draggedIndex,
+      draggedIndices,
       dragEndHandlers,
       activeIndex,
+      activeIndices,
       cellAnimations: {
         ...cellAnimations,
         transform:
@@ -179,9 +186,12 @@ export const useReorderableListCore = <T>({
     [
       draggedHeight,
       currentIndex,
+      currentIndices,
       draggedIndex,
+      draggedIndices,
       dragEndHandlers,
       activeIndex,
+      activeIndices,
       cellAnimations,
       scaleDefault,
       opacityDefault,
@@ -337,6 +347,7 @@ export const useReorderableListCore = <T>({
 
     state.value = ReorderableListState.IDLE;
     draggedIndex.value = -1;
+    draggedIndices.value = [];
     dragY.value = 0;
     dragScrollTranslationY.value = 0;
     scrollViewDragScrollTranslationY.value = 0;
@@ -346,6 +357,7 @@ export const useReorderableListCore = <T>({
   }, [
     state,
     draggedIndex,
+    draggedIndices,
     dragY,
     dragScrollTranslationY,
     scrollViewDragScrollTranslationY,
@@ -447,6 +459,72 @@ export const useReorderableListCore = <T>({
     scrollViewDragScrollTranslationY,
   ]);
 
+  const computeCurrentIndices = useCallback(() => {
+    'worklet';
+  
+    if (currentItemDragCenterY.value === null) {
+      return currentIndices.value[0]; // Return first index of current group
+    }
+  
+    const relativeDragCenterY =
+      flatListScrollOffsetY.value +
+      scrollViewDragScrollTranslationY.value +
+      currentItemDragCenterY.value;
+  
+    // Get the top and bottom positions of the dragged group
+    const firstIndex = currentIndices.value[0];
+    const lastIndex = currentIndices.value[currentIndices.value.length - 1];
+    
+    const currentTopOffset = itemOffset.value[firstIndex];
+    const currentBottomOffset = itemOffset.value[lastIndex] + itemHeight.value[lastIndex];
+    const currentGroupHeight = currentBottomOffset - currentTopOffset;
+    const currentGroupCenter = currentTopOffset + (currentGroupHeight / 2);
+  
+    const max = itemOffset.value.length;
+    const groupSize = currentIndices.value.length;
+    
+    // Calculate possible indices considering group size
+    const possibleIndex =
+      relativeDragCenterY < currentGroupCenter
+        ? Math.max(0, firstIndex - groupSize) // Move up by group size
+        : Math.min(max - groupSize, firstIndex + groupSize); // Move down by group size
+  
+    if (firstIndex !== possibleIndex) {
+      // Calculate center points for the possible new position
+      let possibleTopOffset = itemOffset.value[possibleIndex];
+      let possibleBottomOffset = 0;
+      
+      if (possibleIndex > firstIndex) {
+        // Moving down
+        possibleBottomOffset = possibleTopOffset + currentGroupHeight;
+      } else {
+        // Moving up
+        possibleBottomOffset = possibleTopOffset + currentGroupHeight;
+      }
+  
+      const possibleGroupCenter = possibleTopOffset + (currentGroupHeight / 2);
+  
+      // Calculate distances to determine if we should move
+      const distanceFromCurrent = Math.abs(relativeDragCenterY - currentGroupCenter);
+      const distanceFromPossible = Math.abs(relativeDragCenterY - possibleGroupCenter);
+  
+      // Only move if we're closer to the possible position
+      return distanceFromCurrent <= distanceFromPossible
+        ? firstIndex
+        : possibleIndex;
+    }
+  
+    return firstIndex;
+  }, [
+    currentIndices,
+    currentItemDragCenterY,
+    itemOffset,
+    itemHeight,
+    flatListScrollOffsetY,
+    scrollViewDragScrollTranslationY,
+  ]);
+
+
   const setCurrentIndex = useCallback(() => {
     'worklet';
 
@@ -462,6 +540,28 @@ export const useReorderableListCore = <T>({
       onIndexChange?.({index: newIndex});
     }
   }, [currentIndex, computeCurrentIndex, recomputeLayout, onIndexChange]);
+
+  const setCurrentIndices = useCallback(() => {
+    'worklet';
+ 
+    const newFirstIndex = computeCurrentIndices();
+    
+    if (currentIndices.value[0] !== newFirstIndex) {
+      const offset = newFirstIndex - currentIndices.value[0];
+      const newIndices = currentIndices.value.map(index => index + offset);
+      
+      for (let i = 0; i < currentIndices.value.length; i++) {
+        recomputeLayout(currentIndices.value[i], newIndices[i]);
+      }
+      currentIndices.value = newIndices;
+      
+      // Add haptic feedback when indices change
+      runOnJS(triggerSelectionHaptic)();
+  
+      onIndexChange?.({index: newFirstIndex});
+    }
+  }, [currentIndices, computeCurrentIndices, recomputeLayout, onIndexChange]);
+
 
   const runDefaultDragAnimations = useCallback(
     (type: 'start' | 'end') => {
@@ -495,6 +595,7 @@ export const useReorderableListCore = <T>({
 
         if (shouldUpdateActiveItem) {
           runOnJS(setActiveIndex)(-1);
+          runOnJS(activeIndices)([])
         }
 
         let e = {from: draggedIndex.value, to: currentIndex.value};
@@ -661,6 +762,7 @@ export const useReorderableListCore = <T>({
         state.value === ReorderableListState.AUTOSCROLL
       ) {
         setCurrentIndex();
+        setCurrentIndices();
 
         if (dragDirection.value === scrollDirection(y)) {
           if (state.value !== ReorderableListState.AUTOSCROLL) {
@@ -703,6 +805,7 @@ export const useReorderableListCore = <T>({
         }
 
         setCurrentIndex();
+        setCurrentIndices()
       }
     },
   );
@@ -752,15 +855,49 @@ export const useReorderableListCore = <T>({
     },
   );
 
+  // find active item's children Indices
+  
+  function getItemDepth (item, data){
+    'worklet';
+    if (!item.parentId) return 0;
+    const parent = data.find(i => i.id === item.parentId);
+    if (!parent) return 0;
+   
+    return getItemDepth(parent, data) + 1;
+  };
+  const findChildrenIndices = (index, data) => {
+    'worklet';
+    const item = data[index];
+    const depth = getItemDepth(item, data);
+    const childrenIndices = [];
+    
+    for (let i = index + 1; i < data.length; i++) {
+      const currentDepth = getItemDepth(data[i], data);
+      if (currentDepth <= depth) {
+        break;
+      }
+      childrenIndices.push(i);
+    }
+    console.log(childrenIndices)
+    return childrenIndices;
+  };
+
+
   const startDrag = useCallback(
     (index: number) => {
       'worklet';
-
       if (state.value === ReorderableListState.IDLE) {
         resetSharedValues();
 
+        // calculate active item + children 's height
+        const childrenIndices = findChildrenIndices(index, data)
+        const totalHeights = [index, ...childrenIndices]
+                              .map(i=> itemHeight.value[i])
+                              .reduce((height,sum) => sum + height, 0);
+        
         if (shouldUpdateActiveItem) {
           runOnJS(setActiveIndex)(index);
+          runOnJS(setActiveIndices)(childrenIndices)
         }
 
         // Add haptic feedback when item becomes active
@@ -770,9 +907,11 @@ export const useReorderableListCore = <T>({
         scrollViewDragInitialScrollOffsetY.value =
           scrollViewScrollOffsetY?.value || 0;
 
-        draggedHeight.value = itemHeight.value[index];
+        draggedHeight.value = totalHeights
         draggedIndex.value = index;
+        draggedIndices.value = [index, ...childrenIndices]
         currentIndex.value = index;
+        currentIndices.value = [index, ...childrenIndices]
         state.value = ReorderableListState.DRAGGED;
 
         runOnJS(setScrollEnabled)(false);
@@ -789,13 +928,16 @@ export const useReorderableListCore = <T>({
       scrollViewDragInitialScrollOffsetY,
       setScrollEnabled,
       currentIndex,
+      currentIndices,
       draggedHeight,
       draggedIndex,
+      draggedIndices,
       state,
       flatListScrollOffsetY,
       itemHeight,
       onDragStart,
       runDefaultDragAnimations,
+      data
     ],
   );
 
@@ -829,6 +971,7 @@ export const useReorderableListCore = <T>({
     itemOffset,
     itemHeight,
     draggedIndex,
+    draggedIndices,
     dragY,
     duration,
   };
