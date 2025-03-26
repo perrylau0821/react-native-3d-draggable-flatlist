@@ -127,7 +127,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   );
 
   const animatedStyle = useAnimatedStyle(() => {
-    if (isActiveCell.value) {
+    if (isActiveCell.value || isActiveCells.value) {
       const transform = [{translateY: itemTranslateY.value}];
       if (Array.isArray(cellAnimations.transform)) {
         const customTransform = cellAnimations.transform.map(x =>

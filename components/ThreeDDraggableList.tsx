@@ -70,14 +70,33 @@ const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
 export default function ThreeDDraggableList() {
   const [data, setData] = useState(initialData);
 
-  const handleReorder = ({ from, to }: ReorderableListReorderEvent) => {
+  // const handleReorder = ({ from, to }: ReorderableListReorderEvent) => {
+  //   setData(current => {
+  //     const newData = [...current];
+  //     const [removed] = newData.splice(from, 1);
+  //     newData.splice(to, 0, removed);
+  //     return newData;
+  //   });
+  // };
+
+  const handleReorder = ({ from, to, fromIndices, toIndices }: ReorderableListReorderEvent) => {
     setData(current => {
       const newData = [...current];
-      const [removed] = newData.splice(from, 1);
-      newData.splice(to, 0, removed);
+      
+      // First remove all items from highest to lowest index to maintain index integrity
+      const sortedFromIndices = [...fromIndices].sort((a, b) => b - a);
+      const removedItems = sortedFromIndices.map(index => newData.splice(index, 1)[0]);
+      
+      // Then insert all items from lowest to highest target index
+      removedItems.reverse().forEach((item, i) => {
+        newData.splice(toIndices[i], 0, item);
+      });
+  
       return newData;
     });
   };
+
+
 
   return (
     <View style={styles.container}>

@@ -78,12 +78,14 @@ interface UseReorderableListCoreArgs<T> {
 
 const triggerHaptic = () => {
   if (Platform.OS !== 'web') {
+    
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
   }
 };
 
 const triggerSelectionHaptic = () => {
   if (Platform.OS !== 'web') {
+     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 };
@@ -370,14 +372,42 @@ export const useReorderableListCore = <T>({
     setTimeout(runOnUI(resetSharedValues), duration.value);
   }, [resetSharedValues, duration]);
 
-  const reorder = (fromIndex: number, toIndex: number) => {
-    runOnUI(resetSharedValues)();
+  // const reorder = (fromIndex: number, toIndex: number) => {
+  //   runOnUI(resetSharedValues)();
 
+  //   if (fromIndex !== toIndex) {
+  //     const updateState = () => {
+  //       onReorder({from: fromIndex, to: toIndex});
+  //     };
+
+  //     if (!hasAutomaticBatching) {
+  //       unstable_batchedUpdates(updateState);
+  //     } else {
+  //       updateState();
+  //     }
+  //   }
+  // };
+
+  const reorder = (fromIndex: number, toIndex: number, groupIndices: number[]) => {
+    runOnUI(resetSharedValues)();
+  
     if (fromIndex !== toIndex) {
       const updateState = () => {
-        onReorder({from: fromIndex, to: toIndex});
+        // Calculate the offset between from and to positions
+        const offset = toIndex - fromIndex;
+        
+        // Map the group indices to their new positions
+        const fromIndices = groupIndices;
+        const toIndices = groupIndices.map(index => index + offset);
+  
+        onReorder({
+          from: fromIndex,
+          to: toIndex,
+          fromIndices: fromIndices,
+          toIndices: toIndices
+        });
       };
-
+  
       if (!hasAutomaticBatching) {
         unstable_batchedUpdates(updateState);
       } else {
@@ -385,6 +415,7 @@ export const useReorderableListCore = <T>({
       }
     }
   };
+
 
   const recomputeLayout = useCallback(
     (from: number, to: number) => {
@@ -459,11 +490,76 @@ export const useReorderableListCore = <T>({
     scrollViewDragScrollTranslationY,
   ]);
 
+  // const computeCurrentIndices = useCallback(() => {
+  //   'worklet';
+  
+  //   if (currentItemDragCenterY.value === null) {
+  //     return currentIndices.value[0]; // Return first index of current group
+  //   }
+  
+  //   const relativeDragCenterY =
+  //     flatListScrollOffsetY.value +
+  //     scrollViewDragScrollTranslationY.value +
+  //     currentItemDragCenterY.value;
+  
+  //   // Get the top and bottom positions of the dragged group
+  //   const firstIndex = currentIndices.value[0];
+  //   const lastIndex = currentIndices.value[currentIndices.value.length - 1];
+    
+  //   const currentTopOffset = itemOffset.value[firstIndex];
+  //   const currentBottomOffset = itemOffset.value[lastIndex] + itemHeight.value[lastIndex];
+  //   const currentGroupHeight = currentBottomOffset - currentTopOffset;
+  //   const currentGroupCenter = currentTopOffset + (currentGroupHeight / 2);
+  
+  //   const max = itemOffset.value.length;
+  //   const groupSize = currentIndices.value.length;
+    
+  //   // Calculate possible indices considering group size
+  //   const possibleIndex =
+  //     relativeDragCenterY < currentGroupCenter
+  //       ? Math.max(0, firstIndex - groupSize) // Move up by group size
+  //       : Math.min(max - groupSize, firstIndex + groupSize); // Move down by group size
+  
+  //   if (firstIndex !== possibleIndex) {
+  //     // Calculate center points for the possible new position
+  //     let possibleTopOffset = itemOffset.value[possibleIndex];
+  //     let possibleBottomOffset = 0;
+      
+  //     if (possibleIndex > firstIndex) {
+  //       // Moving down
+  //       possibleBottomOffset = possibleTopOffset + currentGroupHeight;
+  //     } else {
+  //       // Moving up
+  //       possibleBottomOffset = possibleTopOffset + currentGroupHeight;
+  //     }
+  
+  //     const possibleGroupCenter = possibleTopOffset + (currentGroupHeight / 2);
+  
+  //     // Calculate distances to determine if we should move
+  //     const distanceFromCurrent = Math.abs(relativeDragCenterY - currentGroupCenter);
+  //     const distanceFromPossible = Math.abs(relativeDragCenterY - possibleGroupCenter);
+  
+  //     // Only move if we're closer to the possible position
+  //     return distanceFromCurrent <= distanceFromPossible
+  //       ? firstIndex
+  //       : possibleIndex;
+  //   }
+  
+  //   return firstIndex;
+  // }, [
+  //   currentIndices,
+  //   currentItemDragCenterY,
+  //   itemOffset,
+  //   itemHeight,
+  //   flatListScrollOffsetY,
+  //   scrollViewDragScrollTranslationY,
+  // ]);
+
   const computeCurrentIndices = useCallback(() => {
     'worklet';
   
     if (currentItemDragCenterY.value === null) {
-      return currentIndices.value[0]; // Return first index of current group
+      return currentIndices.value[0];
     }
   
     const relativeDragCenterY =
@@ -471,47 +567,52 @@ export const useReorderableListCore = <T>({
       scrollViewDragScrollTranslationY.value +
       currentItemDragCenterY.value;
   
-    // Get the top and bottom positions of the dragged group
-    const firstIndex = currentIndices.value[0];
-    const lastIndex = currentIndices.value[currentIndices.value.length - 1];
+    // Calculate the entire group's dimensions
+    const groupIndices = currentIndices.value;
+    const firstIndex = groupIndices[0];
+    const lastIndex = groupIndices[groupIndices.length - 1];
     
-    const currentTopOffset = itemOffset.value[firstIndex];
-    const currentBottomOffset = itemOffset.value[lastIndex] + itemHeight.value[lastIndex];
-    const currentGroupHeight = currentBottomOffset - currentTopOffset;
-    const currentGroupCenter = currentTopOffset + (currentGroupHeight / 2);
+    // Get total height of the group
+    const groupTopOffset = itemOffset.value[firstIndex];
+    const groupBottomOffset = itemOffset.value[lastIndex] + itemHeight.value[lastIndex];
+    const groupHeight = groupBottomOffset - groupTopOffset;
+    const groupCenter = groupTopOffset + (groupHeight / 2);
   
+    // Find possible new position
     const max = itemOffset.value.length;
-    const groupSize = currentIndices.value.length;
+    let possibleIndex;
     
-    // Calculate possible indices considering group size
-    const possibleIndex =
-      relativeDragCenterY < currentGroupCenter
-        ? Math.max(0, firstIndex - groupSize) // Move up by group size
-        : Math.min(max - groupSize, firstIndex + groupSize); // Move down by group size
+    if (relativeDragCenterY < groupCenter) {
+      // Moving up - check positions above the group
+      for (let i = firstIndex - 1; i >= 0; i--) {
+        const itemCenter = itemOffset.value[i] + (itemHeight.value[i] / 2);
+        if (relativeDragCenterY > itemCenter) {
+          possibleIndex = i;
+          break;
+        }
+      }
+      if (possibleIndex === undefined) possibleIndex = 0;
+    } else {
+      // Moving down - check positions below the group
+      for (let i = lastIndex + 1; i < max; i++) {
+        const itemCenter = itemOffset.value[i] + (itemHeight.value[i] / 2);
+        if (relativeDragCenterY < itemCenter) {
+          possibleIndex = i - groupIndices.length;
+          break;
+        }
+      }
+      if (possibleIndex === undefined) possibleIndex = max - groupIndices.length;
+    }
+  
+    // Ensure we don't exceed list bounds
+    possibleIndex = Math.max(0, Math.min(possibleIndex, max - groupIndices.length));
   
     if (firstIndex !== possibleIndex) {
-      // Calculate center points for the possible new position
-      let possibleTopOffset = itemOffset.value[possibleIndex];
-      let possibleBottomOffset = 0;
-      
-      if (possibleIndex > firstIndex) {
-        // Moving down
-        possibleBottomOffset = possibleTopOffset + currentGroupHeight;
-      } else {
-        // Moving up
-        possibleBottomOffset = possibleTopOffset + currentGroupHeight;
-      }
-  
-      const possibleGroupCenter = possibleTopOffset + (currentGroupHeight / 2);
-  
-      // Calculate distances to determine if we should move
-      const distanceFromCurrent = Math.abs(relativeDragCenterY - currentGroupCenter);
+      const distanceFromCurrent = Math.abs(relativeDragCenterY - groupCenter);
+      const possibleGroupCenter = itemOffset.value[possibleIndex] + (groupHeight / 2);
       const distanceFromPossible = Math.abs(relativeDragCenterY - possibleGroupCenter);
   
-      // Only move if we're closer to the possible position
-      return distanceFromCurrent <= distanceFromPossible
-        ? firstIndex
-        : possibleIndex;
+      return distanceFromCurrent <= distanceFromPossible ? firstIndex : possibleIndex;
     }
   
     return firstIndex;
@@ -523,6 +624,7 @@ export const useReorderableListCore = <T>({
     flatListScrollOffsetY,
     scrollViewDragScrollTranslationY,
   ]);
+
 
 
   const setCurrentIndex = useCallback(() => {
@@ -541,7 +643,7 @@ export const useReorderableListCore = <T>({
     }
   }, [currentIndex, computeCurrentIndex, recomputeLayout, onIndexChange]);
 
-  const setCurrentIndices = useCallback(() => {
+  const _setCurrentIndices = useCallback(() => {
     'worklet';
  
     const newFirstIndex = computeCurrentIndices();
@@ -580,6 +682,8 @@ export const useReorderableListCore = <T>({
     [cellAnimations, scaleDefault, opacityDefault],
   );
 
+
+
   useAnimatedReaction(
     () => gestureState.value,
     () => {
@@ -598,7 +702,19 @@ export const useReorderableListCore = <T>({
           runOnJS(activeIndices)([])
         }
 
-        let e = {from: draggedIndex.value, to: currentIndex.value};
+        // Get the indices of all items being moved
+        const fromIndices = draggedIndices.value;
+        const toIndex = currentIndex.value;
+        const offset = toIndex - draggedIndex.value;
+        const toIndices = fromIndices.map(index => index + offset);
+
+       let e = {
+          from: draggedIndex.value,
+          fromIndices: fromIndices,
+          to: currentIndex.value,
+          toIndices: toIndices
+        };
+        
         onDragEnd?.(e);
 
         const handlers = dragEndHandlers.value[draggedIndex.value];
@@ -606,21 +722,44 @@ export const useReorderableListCore = <T>({
           handlers.forEach(fn => fn(e.from, e.to));
         }
 
-        const currentItemOffset = itemOffset.value[draggedIndex.value];
-        const currentItemHeight = itemHeight.value[draggedIndex.value];
-        const draggedItemOffset = itemOffset.value[currentIndex.value];
-        const draggedItemHeight = itemHeight.value[currentIndex.value];
+        //  // Calculate new position for the entire group
+        const firstItemOffset = itemOffset.value[draggedIndex.value];
+        const lastItemIndex = draggedIndices.value[draggedIndices.value.length - 1];
+        const groupHeight = draggedHeight.value;
+        
+        const targetFirstItemOffset = itemOffset.value[currentIndex.value];
+        const targetLastItemIndex = currentIndex.value + (lastItemIndex - draggedIndex.value);
 
-        const newTopPosition =
-          currentIndex.value > draggedIndex.value
-            ? draggedItemOffset - currentItemOffset
-            : draggedItemOffset -
-              currentItemOffset +
-              (draggedItemHeight - currentItemHeight);
+        // FIXME - not yet very correct
+        // const newTopPosition = currentIndex.value > draggedIndex.value
+        //   ? targetFirstItemOffset - firstItemOffset
+        //   : targetFirstItemOffset - firstItemOffset;
+
+        //FIX ok of single item, but not for GROUP ITEM
+        const groupLength = currentIndices.value.length;
+        const newTopPosition = currentIndex.value > draggedIndex.value
+  ? targetFirstItemOffset - firstItemOffset // Moving down
+  : targetFirstItemOffset - firstItemOffset - (groupHeight - itemHeight.value[currentIndex.value]); // Moving up
+
+        // Calculate new position for the entire group
+        // const currentItemOffset = itemOffset.value[draggedIndex.value];
+        // const currentItemHeight = itemHeight.value[draggedIndex.value];
+        // const draggedItemOffset = itemOffset.value[currentIndex.value];
+        // const draggedItemHeight = itemHeight.value[currentIndex.value];
+
+        // const newTopPosition =
+        //   currentIndex.value > draggedIndex.value
+        //     ? draggedItemOffset - currentItemOffset
+        //     : draggedItemOffset -
+        //       currentItemOffset +
+        //       (draggedItemHeight - currentItemHeight);
+
+
 
         runDefaultDragAnimations('end');
 
         if (dragY.value !== newTopPosition) {
+          
           dragY.value = withTiming(
             newTopPosition,
             {
@@ -628,7 +767,8 @@ export const useReorderableListCore = <T>({
               easing: Easing.out(Easing.ease),
             },
             () => {
-              runOnJS(reorder)(draggedIndex.value, currentIndex.value);
+              // Reorder the entire group
+              runOnJS(reorder)(draggedIndex.value, currentIndex.value, draggedIndices.value);
             },
           );
         } else {
@@ -674,9 +814,11 @@ export const useReorderableListCore = <T>({
         (hiddenArea.top + hiddenArea.bottom) -
         (offsetTop + offsetBottom);
 
+       // Consider the group height when calculating threshold areas
+      const groupHeight = draggedHeight.value;
       const area = visibleHeight * threshold;
       const top = area + offsetTop;
-      const bottom = flatListHeightY.value - area - offsetBottom;
+      const bottom = flatListHeightY.value - Math.max(area, groupHeight) - offsetBottom;
 
       return {top, bottom};
     },
@@ -762,7 +904,7 @@ export const useReorderableListCore = <T>({
         state.value === ReorderableListState.AUTOSCROLL
       ) {
         setCurrentIndex();
-        setCurrentIndices();
+        // setCurrentIndices();
 
         if (dragDirection.value === scrollDirection(y)) {
           if (state.value !== ReorderableListState.AUTOSCROLL) {
@@ -805,7 +947,7 @@ export const useReorderableListCore = <T>({
         }
 
         setCurrentIndex();
-        setCurrentIndices()
+        // setCurrentIndices()
       }
     },
   );

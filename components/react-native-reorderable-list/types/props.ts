@@ -23,20 +23,24 @@ import {MaximumOneOf, SharedValueOrType} from './misc';
 
 export interface ReorderableListReorderEvent {
   /**
-   * Index of the dragged item.
+   * Index of the primary dragged item (parent)
    */
   from: number;
+
   /**
-   * Index where the dragged item was released.
+   * Array of indices for all items being moved (parent + children)
+   */
+  fromIndices: number[];
+
+  /**
+   * Target index where the primary dragged item will be placed
    */
   to: number;
-}
 
-export interface ReorderableListDragStartEvent {
   /**
-   * Index of the dragged item.
+   * Array of new indices where all items will be placed
    */
-  index: number;
+  toIndices: number[];
 }
 
 export interface ReorderableListIndexChangeEvent {

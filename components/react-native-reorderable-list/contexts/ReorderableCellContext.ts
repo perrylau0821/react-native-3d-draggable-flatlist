@@ -6,7 +6,9 @@ interface ReorderableCellContextData {
   index: number;
   dragHandler: () => void;
   draggedIndex: SharedValue<number>;
+  draggedIndices: SharedValue<number[]>;
   isActive: boolean;
+  isActiveChildren: boolean;
 }
 
 export const ReorderableCellContext = React.createContext<
