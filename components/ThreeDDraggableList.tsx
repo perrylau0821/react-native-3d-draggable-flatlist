@@ -30,27 +30,29 @@ const getItemDepth = (item: Item, data: Item[]): number => {
   return getItemDepth(parent, data) + 1;
 };
 
+const getRandomHeight = () => Math.round(Math.random() * 100) + 40
+
 const initialData: Item[] = [
-  { id: '1', title: 'Project Documentation', parentId: null, description: getRandomDescription() },
-  { id: '2', title: 'Getting Started Guide', parentId: '1', description: getRandomDescription() },
-  { id: '3', title: 'Installation Steps', parentId: '2', description: getRandomDescription() },
-  { id: '4', title: 'Configuration', parentId: '2', description: getRandomDescription() },
-  { id: '5', title: 'API Reference', parentId: '1', description: getRandomDescription() },
-  { id: '6', title: 'Endpoints', parentId: '5', description: getRandomDescription() },
-  { id: '7', title: 'Authentication', parentId: '5', description: getRandomDescription() },
-  { id: '8', title: 'Development Tools', parentId: null, description: getRandomDescription() },
-  { id: '9', title: 'Code Editor Setup', parentId: '8', description: getRandomDescription() },
-  { id: '10', title: 'Extensions', parentId: '9', description: getRandomDescription() },
-  { id: '11', title: 'Debug Tools', parentId: '8', description: getRandomDescription() },
-  { id: '12', title: 'Project Structure', parentId: null, description: getRandomDescription() },
-  { id: '13', title: 'Core Components', parentId: '12', description: getRandomDescription() },
-  { id: '14', title: 'UI Elements', parentId: '13', description: getRandomDescription() },
-  { id: '15', title: 'State Management', parentId: '12', description: getRandomDescription() },
-  { id: '16', title: 'Redux Setup', parentId: '15', description: getRandomDescription() },
-  { id: '17', title: 'Testing', parentId: null, description: getRandomDescription() },
-  { id: '18', title: 'Unit Tests', parentId: '17', description: getRandomDescription() },
-  { id: '19', title: 'Integration Tests', parentId: '17', description: getRandomDescription() },
-  { id: '20', title: 'E2E Testing', parentId: '17', description: getRandomDescription() },
+  { id: '1', title: 'Project Documentation', parentId: null, description: getRandomDescription() , height: getRandomHeight() },
+  { id: '2', title: 'Getting Started Guide', parentId: '1', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '3', title: 'Installation Steps', parentId: '2', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '4', title: 'Configuration', parentId: '2', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '5', title: 'API Reference', parentId: '1', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '6', title: 'Endpoints', parentId: '5', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '7', title: 'Authentication', parentId: '5', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '8', title: 'Development Tools', parentId: null, description: getRandomDescription() , height: getRandomHeight() },
+  { id: '9', title: 'Code Editor Setup', parentId: '8', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '10', title: 'Extensions', parentId: '9', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '11', title: 'Debug Tools', parentId: '8', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '12', title: 'Project Structure', parentId: null, description: getRandomDescription() , height: getRandomHeight() },
+  { id: '13', title: 'Core Components', parentId: '12', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '14', title: 'UI Elements', parentId: '13', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '15', title: 'State Management', parentId: '12', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '16', title: 'Redux Setup', parentId: '15', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '17', title: 'Testing', parentId: null, description: getRandomDescription() , height: getRandomHeight() },
+  { id: '18', title: 'Unit Tests', parentId: '17', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '19', title: 'Integration Tests', parentId: '17', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '20', title: 'E2E Testing', parentId: '17', description: getRandomDescription() , height: getRandomHeight() },
 ];
 
 const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
@@ -58,7 +60,7 @@ const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
   const depth = getItemDepth(item, data);
 
   return (
-    <Pressable onLongPress={drag} style={styles.item}>
+    <Pressable onLongPress={drag} style={[styles.item, {height:item.height}]}>
       <Text style={styles.title}>
         {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.title}
       </Text>

@@ -723,12 +723,15 @@ export const useReorderableListCore = <T>({
         }
 
         //  // Calculate new position for the entire group
-        const firstItemOffset = itemOffset.value[draggedIndex.value];
-        const lastItemIndex = draggedIndices.value[draggedIndices.value.length - 1];
-        const groupHeight = draggedHeight.value;
+        // const firstItemOffset = itemOffset.value[draggedIndex.value];
+        // const lastItemIndex = draggedIndices.value[draggedIndices.value.length - 1];
+        // const groupHeight = draggedHeight.value;
+        // const groupLength = currentIndices.value.length;
         
-        const targetFirstItemOffset = itemOffset.value[currentIndex.value];
-        const targetLastItemIndex = currentIndex.value + (lastItemIndex - draggedIndex.value);
+        // const targetFirstItemOffset = itemOffset.value[currentIndex.value];
+        // const targetLastItemIndex = currentIndex.value + (lastItemIndex - draggedIndex.value);
+
+        // console.log({targetFirstItemOffset, firstItemOffset, currIndex:currentIndex.value,  dragIndex:draggedIndex.value, groupLength:groupLength, t:itemHeight.value[currentIndex.value+groupLength]})
 
         // FIXME - not yet very correct
         // const newTopPosition = currentIndex.value > draggedIndex.value
@@ -736,23 +739,30 @@ export const useReorderableListCore = <T>({
         //   : targetFirstItemOffset - firstItemOffset;
 
         //FIX ok of single item, but not for GROUP ITEM
-        const groupLength = currentIndices.value.length;
-        const newTopPosition = currentIndex.value > draggedIndex.value
-  ? targetFirstItemOffset - firstItemOffset // Moving down
-  : targetFirstItemOffset - firstItemOffset - (groupHeight - itemHeight.value[currentIndex.value]); // Moving up
+        
+  //       const newTopPosition = currentIndex.value > draggedIndex.value
+  // ? targetFirstItemOffset - firstItemOffset // Moving down
+  // : targetFirstItemOffset - firstItemOffset - (groupHeight - itemHeight.value[currentIndex.value+groupLength]); // Moving up
 
+      
         // Calculate new position for the entire group
-        // const currentItemOffset = itemOffset.value[draggedIndex.value];
-        // const currentItemHeight = itemHeight.value[draggedIndex.value];
-        // const draggedItemOffset = itemOffset.value[currentIndex.value];
-        // const draggedItemHeight = itemHeight.value[currentIndex.value];
+        const currentItemOffset = itemOffset.value[draggedIndex.value] +                                        (draggedHeight.value - 
+                                  itemHeight.value[currentIndex.value])
+        const currentItemHeight = itemHeight.value[draggedIndex.value];
+        const draggedItemOffset = itemOffset.value[currentIndex.value];
+        const draggedItemHeight = draggedHeight.value;
 
-        // const newTopPosition =
-        //   currentIndex.value > draggedIndex.value
-        //     ? draggedItemOffset - currentItemOffset
-        //     : draggedItemOffset -
-        //       currentItemOffset +
-        //       (draggedItemHeight - currentItemHeight);
+        const newTopPosition =
+          currentIndex.value > draggedIndex.value
+          // move down
+            ? itemOffset.value[currentIndex.value] -   
+              itemOffset.value[draggedIndex.value] 
+              // - itemHeight.value[currentIndex.value + currentIndices.value.length - 1] 
+              // + itemHeight.value[currentIndex.value-1]
+          // move up
+            : draggedItemOffset -
+              currentItemOffset +
+              (draggedItemHeight - currentItemHeight);
 
 
 
