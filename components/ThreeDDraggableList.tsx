@@ -62,7 +62,7 @@ const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
   return (
     <Pressable onLongPress={drag} style={[styles.item, {height:item.height}]}>
       <Text style={styles.title}>
-        {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.title}
+        {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.title} h:{item.height}
       </Text>
       <Text style={styles.description}>{item.description}</Text>
     </Pressable>

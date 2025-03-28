@@ -750,15 +750,20 @@ export const useReorderableListCore = <T>({
                                   itemHeight.value[currentIndex.value])
         const currentItemHeight = itemHeight.value[draggedIndex.value];
         const draggedItemOffset = itemOffset.value[currentIndex.value];
-        const draggedItemHeight = draggedHeight.value;
+        const draggedItemHeight = draggedHeight.value
 
+        // when down
+        const meHeight = itemHeight.value[currentIndex.value];
+        const upperHeight = itemHeight.value[currentIndex.value -1]
+        const discrepancy = meHeight - upperHeight
+        
+        console.log({meHeight, upperHeight, length:currentIndices.value.length, dragIndex:draggedIndex.value, currentIndex:currentIndex.value})
         const newTopPosition =
           currentIndex.value > draggedIndex.value
           // move down
-            ? itemOffset.value[currentIndex.value] -   
-              itemOffset.value[draggedIndex.value] 
-              // - itemHeight.value[currentIndex.value + currentIndices.value.length - 1] 
-              // + itemHeight.value[currentIndex.value-1]
+            ? draggedItemOffset -
+              currentItemOffset +
+              (draggedItemHeight - currentItemHeight) - discrepancy
           // move up
             : draggedItemOffset -
               currentItemOffset +

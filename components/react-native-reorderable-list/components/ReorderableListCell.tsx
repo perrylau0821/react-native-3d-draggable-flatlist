@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useMemo } from 'react';
-import { CellRendererProps, LayoutChangeEvent } from 'react-native';
+import { CellRendererProps, LayoutChangeEvent,View, Text, TextInput } from 'react-native';
+import { ReText}  from 'react-native-redash';
 
 import Animated, {
   Easing,
@@ -11,6 +12,7 @@ import Animated, {
   useDerivedValue,
   useSharedValue,
   withTiming,
+  useAnimatedProps
 } from 'react-native-reanimated';
 
 import { ReorderableCellContext, ReorderableListContext } from '../contexts';
@@ -127,6 +129,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   );
 
   const animatedStyle = useAnimatedStyle(() => {
+    
     if (isActiveCell.value || isActiveCells.value) {
       const transform = [{translateY: itemTranslateY.value}];
       if (Array.isArray(cellAnimations.transform)) {
@@ -163,11 +166,35 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     onLayout?.(e);
   };
 
+  //  DEBUG
+  const dCurrentIndex = useDerivedValue(() => `currIndex: ${currentIndex.value.toString()}`);
+  const dIndex = useDerivedValue(() => `index: ${index}`);
+  const dHeight = useDerivedValue(() => `h: ${itemHeight.value[index]?.toString()}`);
+  const dTop = useDerivedValue(() => `top: ${itemOffset.value[index]?.toString()}`);
+
+ Animated.addWhitelistedNativeProps({ text: true });
+  const debugTextStyle = {fontSize:12, color:'blue', fontWeight:'600'}
+
+ 
   return (
+   
     <ReorderableCellContext.Provider value={contextValue}>
       <Animated.View style={animatedStyle} onLayout={handleLayout}>
+        <View style={{
+          position:'absolute',
+          right:4,
+          zIndex:1000,
+          alignItems:'flex-end',
+          width:1000,
+        }}>
+          <ReText text={dCurrentIndex} style={debugTextStyle}/>
+          <ReText text={dIndex} style={debugTextStyle}/>
+          <ReText text={dHeight} style={debugTextStyle}/>
+          <ReText text={dTop} style={debugTextStyle}/>
+        </View>
         {children}
       </Animated.View>
     </ReorderableCellContext.Provider>
   );
 });
+
