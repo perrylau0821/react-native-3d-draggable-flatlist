@@ -182,10 +182,10 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
       <Animated.View style={animatedStyle} onLayout={handleLayout}>
         <View style={{
           position:'absolute',
-          right:4,
+          right:8,
           zIndex:1000,
           alignItems:'flex-end',
-          width:1000,
+          width:100,
         }}>
           <ReText text={dCurrentIndex} style={debugTextStyle}/>
           <ReText text={dIndex} style={debugTextStyle}/>

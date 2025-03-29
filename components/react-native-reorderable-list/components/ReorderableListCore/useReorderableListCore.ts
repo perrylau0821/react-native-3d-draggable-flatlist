@@ -417,29 +417,112 @@ export const useReorderableListCore = <T>({
   };
 
 
+  // const recomputeLayout = useCallback(
+  //   (from: number, to: number) => {
+  //     'worklet';
+
+  //     const itemDirection = to > from;
+  //     const index1 = itemDirection ? from : to;
+  //     const index2 = itemDirection ? to : from;
+
+  //     const newOffset1 = itemOffset.value[index1];
+  //     const newHeight1 = itemHeight.value[index2];
+  //     const newOffset2 =
+  //       itemOffset.value[index2] +
+  //       itemHeight.value[index2] -
+  //       itemHeight.value[index1];
+  //     const newHeight2 = itemHeight.value[index1];
+
+  //     itemOffset.value[index1] = newOffset1;
+  //     itemHeight.value[index1] = newHeight1;
+  //     itemOffset.value[index2] = newOffset2;
+  //     itemHeight.value[index2] = newHeight2;
+  //   },
+  //   [itemOffset, itemHeight],
+  // );
   const recomputeLayout = useCallback(
     (from: number, to: number) => {
       'worklet';
-
+      // everytime is one step ****
+      const length = currentIndices.value.length;
       const itemDirection = to > from;
-      const index1 = itemDirection ? from : to;
-      const index2 = itemDirection ? to : from;
+      // const index1 = itemDirection ? from : to;
+      // const index2 = itemDirection ? to-1 : to+length;
+      
+//       const newOffset1 = itemOffset.value[index1];
+//       const newHeight1 = itemHeight.value[index2];
+//       const newOffset2 =
+//         itemOffset.value[index2] +
+//         itemHeight.value[index2] -
+//         itemHeight.value[index1];
+//       const newHeight2 = itemHeight.value[index1];
 
-      const newOffset1 = itemOffset.value[index1];
-      const newHeight1 = itemHeight.value[index2];
-      const newOffset2 =
-        itemOffset.value[index2] +
-        itemHeight.value[index2] -
-        itemHeight.value[index1];
-      const newHeight2 = itemHeight.value[index1];
+// console.log({to,from,newHeight2, newHeight1});
+//       itemOffset.value[index1] = newOffset1;
+//       itemHeight.value[index1] = newHeight1;
 
-      itemOffset.value[index1] = newOffset1;
-      itemHeight.value[index1] = newHeight1;
-      itemOffset.value[index2] = newOffset2;
-      itemHeight.value[index2] = newHeight2;
+      if (itemDirection) {
+        // go down
+
+        /* GET */
+        // item being moved
+        const newHOther = itemHeight.value[from+length];
+        const newTOther = itemOffset.value[from];
+        // drag items
+        let sumLastHs = 0;
+        let newH = [];
+        let newT = [];
+        for (let i=0; i<length; i++){
+          newH[i] = itemHeight.value[from+i];
+          newT[i] = itemOffset.value[from]+itemHeight.value[from+length]+sumLastHs;
+          sumLastHs = newH[i] + sumLastHs;
+        }
+
+        /* SET */
+        // item being moved
+        itemHeight.value[to-1] = newHOther;
+        itemOffset.value[to-1] = newTOther;
+        // drag items
+        for (let i=0; i<length; i++){           
+          itemHeight.value[to+i] = newH[i];
+          itemOffset.value[to+i] = newT[i];
+        }
+          // console.log({from,i,newH:newH, newT:newT});
+        
+      } else {
+        // go up
+
+         /* GET */
+        // item being moved
+        const newHOther = itemHeight.value[to];
+        const newTOther = itemOffset.value[to]+draggedHeight.value;
+        // drag items
+        let sumLastHs = 0;
+        let newH = [];
+        let newT = [];
+        for (let i=0; i<length; i++){
+          newH[i] = itemHeight.value[from+i];
+          newT[i] = itemOffset.value[to]+sumLastHs;
+          sumLastHs = newH[i] + sumLastHs;
+        }
+
+         /* SET */
+        // item being moved
+        itemHeight.value[to+length] = newHOther;
+        itemOffset.value[to+length] = newTOther;
+        // drag items
+        for (let i=0; i<length; i++){           
+          itemHeight.value[to+i] = newH[i];
+          itemOffset.value[to+i] = newT[i];
+        }
+
+      }
+      
     },
     [itemOffset, itemHeight],
   );
+
+  
 
   const computeCurrentIndex = useCallback(() => {
     'worklet';
@@ -721,55 +804,31 @@ export const useReorderableListCore = <T>({
         if (Array.isArray(handlers)) {
           handlers.forEach(fn => fn(e.from, e.to));
         }
-
-        //  // Calculate new position for the entire group
-        // const firstItemOffset = itemOffset.value[draggedIndex.value];
-        // const lastItemIndex = draggedIndices.value[draggedIndices.value.length - 1];
-        // const groupHeight = draggedHeight.value;
-        // const groupLength = currentIndices.value.length;
-        
-        // const targetFirstItemOffset = itemOffset.value[currentIndex.value];
-        // const targetLastItemIndex = currentIndex.value + (lastItemIndex - draggedIndex.value);
-
-        // console.log({targetFirstItemOffset, firstItemOffset, currIndex:currentIndex.value,  dragIndex:draggedIndex.value, groupLength:groupLength, t:itemHeight.value[currentIndex.value+groupLength]})
-
-        // FIXME - not yet very correct
-        // const newTopPosition = currentIndex.value > draggedIndex.value
-        //   ? targetFirstItemOffset - firstItemOffset
-        //   : targetFirstItemOffset - firstItemOffset;
-
-        //FIX ok of single item, but not for GROUP ITEM
-        
-  //       const newTopPosition = currentIndex.value > draggedIndex.value
-  // ? targetFirstItemOffset - firstItemOffset // Moving down
-  // : targetFirstItemOffset - firstItemOffset - (groupHeight - itemHeight.value[currentIndex.value+groupLength]); // Moving up
-
       
         // Calculate new position for the entire group
-        const currentItemOffset = itemOffset.value[draggedIndex.value] +                                        (draggedHeight.value - 
-                                  itemHeight.value[currentIndex.value])
+        // move down
+        const currentItemOffset = itemOffset.value[draggedIndex.value];
         const currentItemHeight = itemHeight.value[draggedIndex.value];
         const draggedItemOffset = itemOffset.value[currentIndex.value];
-        const draggedItemHeight = draggedHeight.value
+        const draggedItemHeight = itemHeight.value[currentIndex.value];
 
-        // when down
-        const meHeight = itemHeight.value[currentIndex.value];
-        const upperHeight = itemHeight.value[currentIndex.value -1]
-        const discrepancy = meHeight - upperHeight
-        
-        console.log({meHeight, upperHeight, length:currentIndices.value.length, dragIndex:draggedIndex.value, currentIndex:currentIndex.value})
-        const newTopPosition =
-          currentIndex.value > draggedIndex.value
+        // move up
+        let displacedHeight = 0;
+        const to = currentIndex.value;
+        const move = -currentIndex.value + draggedIndex.value;
+        const length = currentIndices.value.length;
+        for (let i=to+length; i<to+length+move; i++){
+          displacedHeight += itemHeight.value[i]
+        }
+    
+       
+        const newTopPosition = currentIndex.value > draggedIndex.value
           // move down
             ? draggedItemOffset -
-              currentItemOffset +
-              (draggedItemHeight - currentItemHeight) - discrepancy
+              currentItemOffset
           // move up
-            : draggedItemOffset -
-              currentItemOffset +
-              (draggedItemHeight - currentItemHeight);
-
-
+            : -displacedHeight
+         
 
         runDefaultDragAnimations('end');
 
