@@ -544,7 +544,7 @@ export const useReorderableListCore = <T>({
     const possibleIndex =
       relativeDragCenterY < currentCenter
         ? Math.max(0, currentIndex.value - 1)
-        : Math.min(max - 1, currentIndex.value + 1);
+        : Math.min(max - 1 - (currentIndices.value.length - 1), currentIndex.value + 1);
 
     if (currentIndex.value !== possibleIndex) {
       let possibleOffset = itemOffset.value[possibleIndex];
@@ -573,70 +573,7 @@ export const useReorderableListCore = <T>({
     scrollViewDragScrollTranslationY,
   ]);
 
-  // const computeCurrentIndices = useCallback(() => {
-  //   'worklet';
-  
-  //   if (currentItemDragCenterY.value === null) {
-  //     return currentIndices.value[0]; // Return first index of current group
-  //   }
-  
-  //   const relativeDragCenterY =
-  //     flatListScrollOffsetY.value +
-  //     scrollViewDragScrollTranslationY.value +
-  //     currentItemDragCenterY.value;
-  
-  //   // Get the top and bottom positions of the dragged group
-  //   const firstIndex = currentIndices.value[0];
-  //   const lastIndex = currentIndices.value[currentIndices.value.length - 1];
-    
-  //   const currentTopOffset = itemOffset.value[firstIndex];
-  //   const currentBottomOffset = itemOffset.value[lastIndex] + itemHeight.value[lastIndex];
-  //   const currentGroupHeight = currentBottomOffset - currentTopOffset;
-  //   const currentGroupCenter = currentTopOffset + (currentGroupHeight / 2);
-  
-  //   const max = itemOffset.value.length;
-  //   const groupSize = currentIndices.value.length;
-    
-  //   // Calculate possible indices considering group size
-  //   const possibleIndex =
-  //     relativeDragCenterY < currentGroupCenter
-  //       ? Math.max(0, firstIndex - groupSize) // Move up by group size
-  //       : Math.min(max - groupSize, firstIndex + groupSize); // Move down by group size
-  
-  //   if (firstIndex !== possibleIndex) {
-  //     // Calculate center points for the possible new position
-  //     let possibleTopOffset = itemOffset.value[possibleIndex];
-  //     let possibleBottomOffset = 0;
-      
-  //     if (possibleIndex > firstIndex) {
-  //       // Moving down
-  //       possibleBottomOffset = possibleTopOffset + currentGroupHeight;
-  //     } else {
-  //       // Moving up
-  //       possibleBottomOffset = possibleTopOffset + currentGroupHeight;
-  //     }
-  
-  //     const possibleGroupCenter = possibleTopOffset + (currentGroupHeight / 2);
-  
-  //     // Calculate distances to determine if we should move
-  //     const distanceFromCurrent = Math.abs(relativeDragCenterY - currentGroupCenter);
-  //     const distanceFromPossible = Math.abs(relativeDragCenterY - possibleGroupCenter);
-  
-  //     // Only move if we're closer to the possible position
-  //     return distanceFromCurrent <= distanceFromPossible
-  //       ? firstIndex
-  //       : possibleIndex;
-  //   }
-  
-  //   return firstIndex;
-  // }, [
-  //   currentIndices,
-  //   currentItemDragCenterY,
-  //   itemOffset,
-  //   itemHeight,
-  //   flatListScrollOffsetY,
-  //   scrollViewDragScrollTranslationY,
-  // ]);
+ 
 
   const computeCurrentIndices = useCallback(() => {
     'worklet';
