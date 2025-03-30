@@ -145,7 +145,8 @@ export const useReorderableListCore = <T>({
   const dragYOffsets = useSharedValue<number[]>([]); 
   const currentIndex = useSharedValue(-1);
   const currentIndices = useSharedValue<number[]>([]); 
-  const currentCollapsedIndices = useSharedValue<number[]>([])
+  const collapsedNodes = useSharedValue<number[]>([])
+  const collapsedChildren = useSharedValue<number[]>([])
   const draggedIndex = useSharedValue(-1);
   const draggedIndices = useSharedValue<number[]>([]);
   const state = useSharedValue<ReorderableListState>(ReorderableListState.IDLE);
@@ -170,7 +171,8 @@ export const useReorderableListCore = <T>({
       draggedHeight,
       currentIndex,
       currentIndices,
-      currentCollapsedIndices,
+      collapsedNodes,
+      collapsedChildren,
       draggedIndex,
       draggedIndices,
       dragEndHandlers,
@@ -194,7 +196,8 @@ export const useReorderableListCore = <T>({
       draggedHeight,
       currentIndex,
       currentIndices,
-      currentCollapsedIndices,
+      collapsedNodes,
+      collapsedChildren,
       draggedIndex,
       draggedIndices,
       dragEndHandlers,
@@ -992,34 +995,43 @@ export const useReorderableListCore = <T>({
 
     // Toggle collapse state for parent
     itemCollapse.value[index] = !itemCollapse.value[index];
+
+    // ** TODO: handle no children situation
+    // ** TODO: handle when switch index, the move of index
+    // ** TODO: handle when children is moved out of the parent, parent turn to false
+    // ** TODO: give context to consumer outside, to let them animated their chervon isCollapsed indication and number of children
     
     // // Get all children indices for the clicked item
     const childrenIndices = findChildrenIndices(index, data);
-    
-    // // If collapsing, also collapse all children
-    // if (itemCollapse.value[index]) {
-    //   childrenIndices.forEach(childIndex => {
-    //     itemCollapse.value[childIndex] = true;
-    //   });
-    // }
-   
-  //   currentCollapsedIndices.value = currentCollapsedIndices.value.includes(index) 
-  // ? currentCollapsedIndices.value.filter(i => i !== index)
-  // : [...currentCollapsedIndices.value, index];
+    const haveChildren = childrenIndices.length > 0
 
-    const set = new Set(currentCollapsedIndices.value);
-    if (set.has(index)) {
-      set.delete(index);
-    } else {
-      set.add(index);
+    if (haveChildren){
+      // Update collapsed indices set
+      const collapsedSet = new Set(collapsedNodes.value);
+      if (collapsedSet.has(index)) {
+        collapsedSet.delete(index);
+      } else {
+        collapsedSet.add(index);
+      }
+      collapsedNodes.value = [...collapsedSet];
+  
+      // Calculate all children indices for currently collapsed items
+      const allChildrenIndices = new Set<number>();
+      for (const collapsedIndex of collapsedNodes.value) {
+        const children = findChildrenIndices(collapsedIndex, data);
+        children.forEach(childIndex => allChildrenIndices.add(childIndex));
+      }
+      collapsedChildren.value = [...allChildrenIndices];
     }
-    currentCollapsedIndices.value = [...set];
 
     
     
     // Notify parent component
     if (onCollapse) {
-      runOnJS(onCollapse)({ index, childrenIndices });
+      runOnJS(onCollapse)({ 
+        index, 
+        childrenIndices, 
+        allCollapsedChildren: collapsedChildren.value });
     }
 
 

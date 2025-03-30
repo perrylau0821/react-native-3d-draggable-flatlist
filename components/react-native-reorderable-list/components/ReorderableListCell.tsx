@@ -55,7 +55,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     data
   } = props;
 
-  const { currentIndex, currentIndices, currentCollapsedIndices, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
+  const { currentIndex, currentIndices, collapsedNodes, collapsedChildren, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
     useContext(ReorderableListContext);
     
   const dragHandler = useCallback(
@@ -101,8 +101,8 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   const isActiveCells = useDerivedValue(() => draggedIndices.value.includes(index))
   
   const height = useDerivedValue(() => itemHeight.value[index])
-  const isCollapsedCell = useDerivedValue(() => currentCollapsedIndices.value.includes(index))
-  const isCollapsedCellChildren = useDerivedValue(() => {})
+  const isCollapsedCell = useDerivedValue(() => collapsedNodes.value.includes(index))
+  const isCollapsedChildrenCells = useDerivedValue(() => collapsedChildren.value.includes(index))
 
   useAnimatedReaction(
     () => dragY.value,
@@ -149,12 +149,12 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   );
 
   useAnimatedReaction(
-    () => currentCollapsedIndices.value,
+    () => collapsedChildren.value,
     (current) => {
-      // Update the local itemCollapse value based on currentCollapsedIndices
-      isCollapsedCell.value = current.includes(index);
-console.log({item})
-      height.value = withTiming(isCollapsedCell.value ? 0 : itemHeight.value[index], {
+      // Update the local itemCollapse and height value
+      isCollapsedChildrenCells.value = current.includes(index);
+
+      height.value = withTiming(isCollapsedChildrenCells.value ? 0 : itemHeight.value[index], {
             duration: animationDuration.value,
             easing: Easing.out(Easing.ease),
           });
@@ -202,7 +202,7 @@ console.log({item})
 
     })(e.nativeEvent.layout.y, e.nativeEvent.layout.height);
 
-    // set local height variable for first intial animation
+    // Update the local height value on first render
     height.value = e.nativeEvent.layout.height
     onLayout?.(e);
   };
