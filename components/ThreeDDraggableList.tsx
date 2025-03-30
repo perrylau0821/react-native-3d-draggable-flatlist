@@ -3,6 +3,7 @@ import { StyleSheet, Text, Pressable, View } from 'react-native';
 import ReorderableList, {
   ReorderableListReorderEvent,
   useReorderableDrag,
+  useCollapsible
 } from './react-native-reorderable-list';
 
 interface Item {
@@ -57,10 +58,11 @@ const initialData: Item[] = [
 
 const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
   const drag = useReorderableDrag();
+  const collapse = useCollapsible();
   const depth = getItemDepth(item, data);
 
   return (
-    <Pressable onLongPress={drag} style={[styles.item, {height:item.height}]}>
+    <Pressable onPress={collapse} onLongPress={drag} style={[styles.item]}>
       <Text style={styles.title}>
         {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.title} h:{item.height}
       </Text>
@@ -72,14 +74,6 @@ const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
 export default function ThreeDDraggableList() {
   const [data, setData] = useState(initialData);
 
-  // const handleReorder = ({ from, to }: ReorderableListReorderEvent) => {
-  //   setData(current => {
-  //     const newData = [...current];
-  //     const [removed] = newData.splice(from, 1);
-  //     newData.splice(to, 0, removed);
-  //     return newData;
-  //   });
-  // };
 
   const handleReorder = ({ from, to, fromIndices, toIndices }: ReorderableListReorderEvent) => {
     setData(current => {

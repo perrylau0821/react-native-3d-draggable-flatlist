@@ -12,6 +12,7 @@ import Animated, {
   useDerivedValue,
   useSharedValue,
   withTiming,
+  withSpring,
   useAnimatedProps
 } from 'react-native-reanimated';
 
@@ -21,9 +22,11 @@ import { applyAnimatedStyles } from './helpers';
 
 interface ReorderableListCellProps<T>
   extends Omit<CellRendererProps<T>, 'cellKey'> {
+  collapse: (index: number) => void;
   startDrag: (index: number) => void;
   itemOffset: SharedValue<number[]>;
   itemHeight: SharedValue<number[]>;
+  itemCollapse: SharedValue<boolean[]>;
   dragY: SharedValue<number>;
   draggedIndex: SharedValue<number>;
   draggedIndices: SharedValue<number[]>;
@@ -37,11 +40,13 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
 ) {
   const {
     index,
+    collapse,
     startDrag,
     children,
     onLayout,
     itemOffset,
     itemHeight,
+    itemCollapse,
     dragY,
     draggedIndex,
     draggedIndices,
@@ -50,7 +55,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     data
   } = props;
 
-  const { currentIndex, currentIndices, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
+  const { currentIndex, currentIndices, currentCollapsedIndices, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
     useContext(ReorderableListContext);
     
   const dragHandler = useCallback(
@@ -58,18 +63,29 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     [startDrag, index],
   );
 
+  const collapseHandler = useCallback(
+    () => runOnUI(collapse)(index),
+    [collapse, index],
+  );
+
   const isActive = activeIndex === index;
   const isActiveChildren = activeIndices.includes(index) && !isActive;
+  const isCollapsed = itemCollapse.value[index]
+  const isCollapsedChildren = itemCollapse.value.includes(index) && !isCollapsed;
+
   const contextValue = useMemo(
     () => ({
       index,
+      collapseHandler,
+      isCollapsed,
+      isCollapsedChildren,
       dragHandler,
       draggedIndex,
       draggedIndices,
       isActive,
       isActiveChildren
     }),
-    [index, dragHandler, draggedIndex, draggedIndices, isActive, isActiveChildren],
+    [index, collapseHandler, isCollapsed, isCollapsedChildren, dragHandler, draggedIndex, draggedIndices, isActive, isActiveChildren],
   );
 
   // Calculate indentation based on depth
@@ -83,6 +99,10 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   const itemTranslateY = useSharedValue(0);
   const isActiveCell = useDerivedValue(() => draggedIndex.value === index);
   const isActiveCells = useDerivedValue(() => draggedIndices.value.includes(index))
+  
+  const height = useDerivedValue(() => itemHeight.value[index])
+  const isCollapsedCell = useDerivedValue(() => currentCollapsedIndices.value.includes(index))
+  const isCollapsedCellChildren = useDerivedValue(() => {})
 
   useAnimatedReaction(
     () => dragY.value,
@@ -128,6 +148,19 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     },
   );
 
+  useAnimatedReaction(
+    () => currentCollapsedIndices.value,
+    (current) => {
+      // Update the local itemCollapse value based on currentCollapsedIndices
+      isCollapsedCell.value = current.includes(index);
+console.log({item})
+      height.value = withTiming(isCollapsedCell.value ? 0 : itemHeight.value[index], {
+            duration: animationDuration.value,
+            easing: Easing.out(Easing.ease),
+          });
+    },
+  )
+
   const animatedStyle = useAnimatedStyle(() => {
     
     if (isActiveCell.value || isActiveCells.value) {
@@ -143,17 +176,21 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
         {
           transform,
           zIndex: 999,
-          paddingLeft: indentation
+          paddingLeft: indentation,
+          height: height.value,
+          overflow: 'hidden'
         },
         cellAnimations,
         ['transform'],
       );
     }
-
+   
     return {
       transform: [{translateY: itemTranslateY.value}],
       zIndex: 0,
-      paddingLeft: indentation
+      paddingLeft: indentation,
+      height: height.value,
+      overflow: 'hidden'
     };
   });
 
@@ -161,8 +198,12 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     runOnUI((y: number, height: number) => {
       itemOffset.value[index] = y;
       itemHeight.value[index] = height;
+      itemCollapse.value[index] = false
+
     })(e.nativeEvent.layout.y, e.nativeEvent.layout.height);
 
+    // set local height variable for first intial animation
+    height.value = e.nativeEvent.layout.height
     onLayout?.(e);
   };
 
@@ -171,6 +212,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   const dIndex = useDerivedValue(() => `index: ${index}`);
   const dHeight = useDerivedValue(() => `h: ${itemHeight.value[index]?.toString()}`);
   const dTop = useDerivedValue(() => `top: ${itemOffset.value[index]?.toString()}`);
+  const dCollapsed = useDerivedValue(() => `collapse: ${isCollapsedCell.value?.toString()}`);
 
  Animated.addWhitelistedNativeProps({ text: true });
   const debugTextStyle = {fontSize:12, color:'blue', fontWeight:'600'}
@@ -191,6 +233,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
           <ReText text={dIndex} style={debugTextStyle}/>
           <ReText text={dHeight} style={debugTextStyle}/>
           <ReText text={dTop} style={debugTextStyle}/>
+          <ReText text={dCollapsed} style={debugTextStyle}/>
         </View>
         {children}
       </Animated.View>

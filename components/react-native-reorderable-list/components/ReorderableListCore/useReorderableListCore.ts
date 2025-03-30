@@ -57,6 +57,7 @@ interface UseReorderableListCoreArgs<T> {
   autoscrollActivationDelta: number;
   animationDuration: number;
   onReorder: (event: ReorderableListReorderEvent) => void;
+  onCollapse: (event) => void;
   onDragStart?: (event: ReorderableListDragStartEvent) => void;
   onDragEnd?: (event: ReorderableListDragEndEvent) => void;
   onIndexChange?: (event: ReorderableListIndexChangeEvent) => void;
@@ -99,6 +100,7 @@ export const useReorderableListCore = <T>({
   autoscrollActivationDelta,
   animationDuration,
   onReorder,
+  onCollapse,
   onDragStart,
   onDragEnd,
   onLayout,
@@ -136,12 +138,14 @@ export const useReorderableListCore = <T>({
   const draggedHeight = useSharedValue(0);
   const itemOffset = useSharedValue<number[]>([]);
   const itemHeight = useSharedValue<number[]>([]);
+  const itemCollapse = useSharedValue<boolean[]>([]);
   const autoscrollTrigger = useSharedValue(-1);
   const lastAutoscrollTrigger = useSharedValue(-1);
   const dragY = useSharedValue(0);
   const dragYOffsets = useSharedValue<number[]>([]); 
   const currentIndex = useSharedValue(-1);
   const currentIndices = useSharedValue<number[]>([]); 
+  const currentCollapsedIndices = useSharedValue<number[]>([])
   const draggedIndex = useSharedValue(-1);
   const draggedIndices = useSharedValue<number[]>([]);
   const state = useSharedValue<ReorderableListState>(ReorderableListState.IDLE);
@@ -166,6 +170,7 @@ export const useReorderableListCore = <T>({
       draggedHeight,
       currentIndex,
       currentIndices,
+      currentCollapsedIndices,
       draggedIndex,
       draggedIndices,
       dragEndHandlers,
@@ -189,6 +194,7 @@ export const useReorderableListCore = <T>({
       draggedHeight,
       currentIndex,
       currentIndices,
+      currentCollapsedIndices,
       draggedIndex,
       draggedIndices,
       dragEndHandlers,
@@ -372,21 +378,6 @@ export const useReorderableListCore = <T>({
     setTimeout(runOnUI(resetSharedValues), duration.value);
   }, [resetSharedValues, duration]);
 
-  // const reorder = (fromIndex: number, toIndex: number) => {
-  //   runOnUI(resetSharedValues)();
-
-  //   if (fromIndex !== toIndex) {
-  //     const updateState = () => {
-  //       onReorder({from: fromIndex, to: toIndex});
-  //     };
-
-  //     if (!hasAutomaticBatching) {
-  //       unstable_batchedUpdates(updateState);
-  //     } else {
-  //       updateState();
-  //     }
-  //   }
-  // };
 
   const reorder = (fromIndex: number, toIndex: number, groupIndices: number[]) => {
     runOnUI(resetSharedValues)();
@@ -416,50 +407,12 @@ export const useReorderableListCore = <T>({
     }
   };
 
-
-  // const recomputeLayout = useCallback(
-  //   (from: number, to: number) => {
-  //     'worklet';
-
-  //     const itemDirection = to > from;
-  //     const index1 = itemDirection ? from : to;
-  //     const index2 = itemDirection ? to : from;
-
-  //     const newOffset1 = itemOffset.value[index1];
-  //     const newHeight1 = itemHeight.value[index2];
-  //     const newOffset2 =
-  //       itemOffset.value[index2] +
-  //       itemHeight.value[index2] -
-  //       itemHeight.value[index1];
-  //     const newHeight2 = itemHeight.value[index1];
-
-  //     itemOffset.value[index1] = newOffset1;
-  //     itemHeight.value[index1] = newHeight1;
-  //     itemOffset.value[index2] = newOffset2;
-  //     itemHeight.value[index2] = newHeight2;
-  //   },
-  //   [itemOffset, itemHeight],
-  // );
   const recomputeLayout = useCallback(
     (from: number, to: number) => {
       'worklet';
       // everytime is one step ****
       const length = currentIndices.value.length;
       const itemDirection = to > from;
-      // const index1 = itemDirection ? from : to;
-      // const index2 = itemDirection ? to-1 : to+length;
-      
-//       const newOffset1 = itemOffset.value[index1];
-//       const newHeight1 = itemHeight.value[index2];
-//       const newOffset2 =
-//         itemOffset.value[index2] +
-//         itemHeight.value[index2] -
-//         itemHeight.value[index1];
-//       const newHeight2 = itemHeight.value[index1];
-
-// console.log({to,from,newHeight2, newHeight1});
-//       itemOffset.value[index1] = newOffset1;
-//       itemHeight.value[index1] = newHeight1;
 
       if (itemDirection) {
         // go down
@@ -487,7 +440,6 @@ export const useReorderableListCore = <T>({
           itemHeight.value[to+i] = newH[i];
           itemOffset.value[to+i] = newT[i];
         }
-          // console.log({from,i,newH:newH, newT:newT});
         
       } else {
         // go up
@@ -1031,9 +983,47 @@ export const useReorderableListCore = <T>({
       }
       childrenIndices.push(i);
     }
-    console.log(childrenIndices)
+
     return childrenIndices;
   };
+
+  const collapse = useCallback((index: number) => {
+    'worklet';
+
+    // Toggle collapse state for parent
+    itemCollapse.value[index] = !itemCollapse.value[index];
+    
+    // // Get all children indices for the clicked item
+    const childrenIndices = findChildrenIndices(index, data);
+    
+    // // If collapsing, also collapse all children
+    // if (itemCollapse.value[index]) {
+    //   childrenIndices.forEach(childIndex => {
+    //     itemCollapse.value[childIndex] = true;
+    //   });
+    // }
+   
+  //   currentCollapsedIndices.value = currentCollapsedIndices.value.includes(index) 
+  // ? currentCollapsedIndices.value.filter(i => i !== index)
+  // : [...currentCollapsedIndices.value, index];
+
+    const set = new Set(currentCollapsedIndices.value);
+    if (set.has(index)) {
+      set.delete(index);
+    } else {
+      set.add(index);
+    }
+    currentCollapsedIndices.value = [...set];
+
+    
+    
+    // Notify parent component
+    if (onCollapse) {
+      runOnJS(onCollapse)({ index, childrenIndices });
+    }
+
+
+  }, [data, itemCollapse, onCollapse]);
 
 
   const startDrag = useCallback(
@@ -1119,10 +1109,12 @@ export const useReorderableListCore = <T>({
     handleScroll,
     handleFlatListLayout,
     handleRef,
+    collapse,
     startDrag,
     listContextValue,
     itemOffset,
     itemHeight,
+    itemCollapse,
     draggedIndex,
     draggedIndices,
     dragY,

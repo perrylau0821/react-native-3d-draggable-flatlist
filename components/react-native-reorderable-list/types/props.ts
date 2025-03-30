@@ -135,6 +135,10 @@ export interface ReorderableListProps<T>
    * An animated scroll handler created with useAnimatedScrollHandler. See [Reanimated docs](https://docs.swmansion.com/react-native-reanimated) for further info.
    */
   onScroll?: ReturnType<typeof useAnimatedScrollHandler>;
+    /**
+   * Event fired when an item is dragged. Needs to be a `worklet`. See [Reanimated docs](https://docs.swmansion.com/react-native-reanimated) for further info.
+   */
+  onCollapse?: (event) => void;
   /**
    * Event fired when an item is dragged. Needs to be a `worklet`. See [Reanimated docs](https://docs.swmansion.com/react-native-reanimated) for further info.
    */

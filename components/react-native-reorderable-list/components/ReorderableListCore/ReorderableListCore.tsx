@@ -50,6 +50,7 @@ const ReorderableListCore = <T,>(
     onLayout,
     onReorder,
     onScroll,
+    onCollapse,
     onDragStart,
     onDragEnd,
     onIndexChange,
@@ -74,10 +75,12 @@ const ReorderableListCore = <T,>(
     handleScroll,
     handleFlatListLayout,
     handleRef,
+    collapse,
     startDrag,
     listContextValue,
     itemOffset,
     itemHeight,
+    itemCollapse,
     dragY,
     draggedIndex,
     draggedIndices,
@@ -92,6 +95,7 @@ const ReorderableListCore = <T,>(
     animationDuration,
     onLayout,
     onReorder,
+    onCollapse,
     onDragStart,
     onDragEnd,
     onIndexChange,
@@ -135,14 +139,16 @@ const ReorderableListCore = <T,>(
         key={`${cellKey}+${props.index}`}
         itemOffset={itemOffset}
         itemHeight={itemHeight}
+        itemCollapse={itemCollapse}
         dragY={dragY}
         draggedIndex={draggedIndex}
         draggedIndices={draggedIndices}
         animationDuration={duration}
+        collapse={collapse}
         startDrag={startDrag}
       />
     ),
-    [itemOffset, itemHeight, dragY, draggedIndex, draggedIndices, duration, startDrag],
+    [itemOffset, itemHeight, itemCollapse, dragY, draggedIndex, draggedIndices, duration, collapse, startDrag],
   );
 
   return (

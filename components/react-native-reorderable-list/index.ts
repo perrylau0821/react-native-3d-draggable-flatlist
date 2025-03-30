@@ -5,6 +5,7 @@ import {
 } from './components';
 import {
   useIsActive,
+  useCollapsible,
   useReorderableDrag,
   useReorderableDragEnd,
   useReorderableDragStart,
@@ -22,6 +23,7 @@ import {reorderItems} from './utils';
 
 export {
   useIsActive,
+  useCollapsible,
   useReorderableDrag,
   useReorderableDragStart,
   useReorderableDragEnd,
