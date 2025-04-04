@@ -62,7 +62,7 @@ const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
   const depth = getItemDepth(item, data);
 
   return (
-    <Pressable onPress={collapse} onLongPress={drag} style={[styles.item]}>
+    <Pressable onPress={collapse} onLongPress={drag} style={[styles.item, {height:item.height}]}>
       <Text style={styles.title}>
         {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.title} h:{item.height}
       </Text>

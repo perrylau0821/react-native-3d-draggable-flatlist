@@ -154,10 +154,10 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
       // Update the local itemCollapse and height value
       isCollapsedChildrenCells.value = current.includes(index);
 
-      height.value = withTiming(isCollapsedChildrenCells.value ? 0 : itemHeight.value[index], {
-            duration: animationDuration.value,
-            easing: Easing.out(Easing.ease),
-          });
+      // height.value = withTiming(isCollapsedChildrenCells.value ? 0 : itemHeight.value[index], {
+      //       duration: animationDuration.value,
+      //       easing: Easing.out(Easing.ease),
+      //     });
     },
   )
 
