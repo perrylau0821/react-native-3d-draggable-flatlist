@@ -119,6 +119,7 @@ export const useReorderableListCore = <T>({
   depthExtractor,
   data
 }: UseReorderableListCoreArgs<T>) => {
+  const dataRef = useSharedValue(data);
   const flatListRef = useAnimatedRef<FlatList>();
   const [activeIndex, setActiveIndex] = useState(-1);
   const [activeIndices, setActiveIndices] = useState([])
@@ -139,14 +140,15 @@ export const useReorderableListCore = <T>({
   const itemOffset = useSharedValue<number[]>([]);
   const itemHeight = useSharedValue<number[]>([]);
   const itemCollapse = useSharedValue<boolean[]>([]);
+  const itemCollapseChildren = useSharedValue<boolean[]>([]);
   const autoscrollTrigger = useSharedValue(-1);
   const lastAutoscrollTrigger = useSharedValue(-1);
   const dragY = useSharedValue(0);
   const dragYOffsets = useSharedValue<number[]>([]); 
   const currentIndex = useSharedValue(-1);
   const currentIndices = useSharedValue<number[]>([]); 
-  const collapsedNodes = useSharedValue<number[]>([])
-  const collapsedChildren = useSharedValue<number[]>([])
+  const currentCollapsed = useSharedValue<number[]>([])
+  const currentCollapsedChildren = useSharedValue<number[]>([])
   const draggedIndex = useSharedValue(-1);
   const draggedIndices = useSharedValue<number[]>([]);
   const state = useSharedValue<ReorderableListState>(ReorderableListState.IDLE);
@@ -166,13 +168,20 @@ export const useReorderableListCore = <T>({
     autoscrollDelta.value = autoscrollActivationDelta;
   }, [duration, animationDuration, autoscrollDelta, autoscrollActivationDelta]);
 
+  useEffect(() => {
+    dataRef.value = data;
+    console.log({data:data.map(d=>parseInt(d.id))})
+  }, [data]);
+
+  // useEffect(()=>{console.log('DATA CHANGE'); console.log(JSON.stringify({data}, null, 2))},[data])
+
   const listContextValue = useMemo(
     () => ({
       draggedHeight,
       currentIndex,
       currentIndices,
-      collapsedNodes,
-      collapsedChildren,
+      currentCollapsed,
+      currentCollapsedChildren,
       draggedIndex,
       draggedIndices,
       dragEndHandlers,
@@ -196,8 +205,8 @@ export const useReorderableListCore = <T>({
       draggedHeight,
       currentIndex,
       currentIndices,
-      collapsedNodes,
-      collapsedChildren,
+      currentCollapsed,
+      currentCollapsedChildren,
       draggedIndex,
       draggedIndices,
       dragEndHandlers,
@@ -382,37 +391,191 @@ export const useReorderableListCore = <T>({
   }, [resetSharedValues, duration]);
 
   // find active item's children Indices
-  function getItemDepth (item, data){
+  function getItemDepth (item){
     'worklet';
     if (!item.parentId) return 0;
-    const parent = data.find(i => i.id === item.parentId);
+    const parent = dataRef.value.find(i => i.id === item.parentId);
     if (!parent) return 0;
    
-    return getItemDepth(parent, data) + 1;
+    return getItemDepth(parent) + 1;
   };
   
-  const findChildrenIndices = (index, data) => {
+  const findChildrenIndices = (index) => {
     'worklet';
-    const item = data[index];
-    const depth = getItemDepth(item, data);
+    const item = dataRef.value[index];
+    const depth = getItemDepth(item);
     const childrenIndices = [];
     
-    for (let i = index + 1; i < data.length; i++) {
-      const currentDepth = getItemDepth(data[i], data);
+    for (let i = index + 1; i < dataRef.value.length; i++) {
+      const currentDepth = getItemDepth(dataRef.value[i]);
       if (currentDepth <= depth) {
         break;
       }
       childrenIndices.push(i);
     }
-
+  
     return childrenIndices;
   };
 
-  const toggleCollapseNodes = (index, shdHave) => {
+  const getTotalCollapsedHeight = (index: number, data: any[]) => {
+    'worklet';
+    
+    // First check if this index is a collapse child
+    if (itemCollapseChildren.value[index]) {
+      // Find the parent collapse node by scanning backwards
+      let parentIndex = index;
+      while (parentIndex >= 0) {
+        if (itemCollapse.value[parentIndex]) {
+          // Found the parent collapse node
+          // Now get all its children
+          const children = findChildrenIndices(parentIndex);
+          if (children.includes(index)) {
+            // Calculate total height starting from parent
+            let totalHeight = itemHeight.value[parentIndex];
+            for (const childIndex of children) {
+              totalHeight += itemHeight.value[childIndex];
+            }
+            return totalHeight;
+          }
+        }
+        parentIndex--;
+      }
+      return itemHeight.value[index]; // Fallback if no parent found
+    }
+  
+    // If this is a collapse node, calculate its total height plus children
+    if (itemCollapse.value[index]) {
+      let totalHeight = itemHeight.value[index];
+      const children = findChildrenIndices(index);
+      for (const childIndex of children) {
+        totalHeight += itemHeight.value[childIndex];
+      }
+      return totalHeight;
+    }
+  
+    // If neither collapse node nor child, return own height
+    return itemHeight.value[index];
+  };
+
+  const getCollapseGroupInfo = (index: number) => {
+    'worklet';
+  
+    // First check if this index is a collapse child
+    if (itemCollapseChildren.value[index]) {
+      // Find the parent collapse node by scanning backwards
+      let parentIndex = index;
+
+      while (parentIndex >= 0) {
+        // Topmost Parent : is collapse and not collapse children
+        if (itemCollapse.value[parentIndex] && !itemCollapseChildren.value[parentIndex]) {
+          // Found the parent collapse node
+          // Now get all its collapsed children
+          const collapsedChildren = currentCollapsedChildren.value.filter(i => {
+            const children = findChildrenIndices(parentIndex);
+            return children.includes(i)
+          });
+          
+          // Return the collapse group info starting from parent
+          let totalHeight = itemHeight.value[parentIndex];
+          for (const childIndex of collapsedChildren) {
+            totalHeight += itemHeight.value[childIndex];
+          }
+          return {
+            offset: itemOffset.value[parentIndex],
+            height: totalHeight,
+            parentIndex: parentIndex,
+            children: collapsedChildren
+          };
+         
+        }
+        parentIndex--;
+      }
+      // Fallback if no parent found
+      return {
+        offset: itemOffset.value[index],
+        height: itemHeight.value[index],
+        parentIndex: -1,
+        children: []
+      };
+    }
+
+    // First check if this index is a collapse child
+    // if (itemCollapseChildren.value[index]) {
+    //   // Find the topmost parent collapse node by scanning backwards
+    //   let parentIndex = index;
+    //   let topmostParentIndex = -1;
+  
+    //   while (parentIndex >= 0) {
+    //     if (itemCollapse.value[parentIndex]) {
+    //       // Found a parent collapse node, keep track of it
+    //       topmostParentIndex = parentIndex;
+    //     }
+    //     parentIndex--;
+    //   }
+  
+    //   // If we found a parent collapse node
+    //   if (topmostParentIndex >= 0) {
+    //     // Get all children of the topmost parent
+    //     const children = findChildrenIndices(topmostParentIndex);
+    //     const collapsedChildren = currentCollapsedChildren.value.filter(i => 
+    //       children.includes(i)
+    //     );
+        
+    //     // Calculate total height starting from topmost parent
+    //     let totalHeight = itemHeight.value[topmostParentIndex];
+    //     for (const childIndex of collapsedChildren) {
+    //       totalHeight += itemHeight.value[childIndex];
+    //     }
+  
+    //     return {
+    //       offset: itemOffset.value[topmostParentIndex],
+    //       height: totalHeight,
+    //       parentIndex: topmostParentIndex,
+    //       children: collapsedChildren
+    //     };
+    //   }
+  
+    //   // Fallback if no parent found
+    //   return {
+    //     offset: itemOffset.value[index],
+    //     height: itemHeight.value[index], 
+    //     parentIndex: -1,
+    //     children: []
+    //   };
+    // }
+  
+    // If this is a collapse node, calculate its total height plus children
+    if (itemCollapse.value[index]) {
+      let totalHeight = itemHeight.value[index];
+      const children = findChildrenIndices(index);
+      console.log(index, children)
+      const collapsedChildren = currentCollapsedChildren.value.filter(i => children.includes(i));
+      for (const childIndex of collapsedChildren) {
+        totalHeight += itemHeight.value[childIndex];
+      }
+      return {
+        offset: itemOffset.value[index],
+        height: totalHeight,
+        parentIndex: index,
+        children: collapsedChildren
+      };
+    }
+  
+    // If neither collapse node nor child, return own info
+    return {
+      offset: itemOffset.value[index],
+      height: itemHeight.value[index],
+      parentIndex: -1,
+      children: []
+    };
+  };
+
+
+  const toggleCurrentCollapsed = (index, shdHave) => {
     'worklet';
    
-    const collapsedSet = new Set(collapsedNodes.value);
-    if (!shdHave){
+    const collapsedSet = new Set(currentCollapsed.value);
+    if (shdHave == undefined){
       if (collapsedSet.has(index)) 
         collapsedSet.delete(index);
       else collapsedSet.add(index);
@@ -423,78 +586,90 @@ export const useReorderableListCore = <T>({
         shdHave ? collapsedSet.add(index) : null;
     }
     
-    collapsedNodes.value = [...collapsedSet];
-  }
-
-  const setCollapsedNodes = () => {
-    'worklet';
-    collapsedNodes.value = itemCollapse.value.map((v,i) => v === true ? i : undefined).filter(v => v!==undefined)
+    currentCollapsed.value = [...collapsedSet];
   }
   
-  const recomputeCollapsedChildren = () => {
+  const toggleCurrentCollapsedChildren = (index, shdHave) => {
     'worklet';
-    
-    const allChildrenIndices = new Set<number>();
-    
-    for (const nodeIndex of collapsedNodes.value) {
-      const children = findChildrenIndices(nodeIndex, data);
-      children.forEach(childIndex => {
-        // set children's height and offset
-        // itemHeight.value[childIndex] = 0
-        // itemOffset.value[childIndex] = itemOffset.value[nodeIndex] + itemHeight.value[nodeIndex]
-        
-        allChildrenIndices.add(childIndex)
-      });
+   
+    const collapsedSet = new Set(currentCollapsedChildren.value);
+    if (shdHave == undefined){
+      if (collapsedSet.has(index)) 
+        collapsedSet.delete(index);
+      else collapsedSet.add(index);
+    } else {
+      if (collapsedSet.has(index))
+        shdHave ? null : collapsedSet.delete(index);
+      else 
+        shdHave ? collapsedSet.add(index) : null;
     }
-
-    // set collapsedChildren
-    collapsedChildren.value = [...allChildrenIndices];
-
-
-    // ///////// testing set itemHeight to 0 when collapse,
-    // ///// but need to set back to its original
-    // for (const index of [...allChildrenIndices] ){
-    // //// * item Offset also need to be set.
-    //   /// collapse is just like moving items. similiar
-    //   // console.log(index)
-    //   itemHeight.value[index] = 0
-    //   itemOffset.value[index] = 
-    // }
+    
+    currentCollapsedChildren.value = [...collapsedSet];
   }
+
+  const setCurrentCollapsed = () => {
+    'worklet';
+    currentCollapsed.value = itemCollapse.value.map((v,i) => v === true ? i : undefined).filter(v => v!==undefined)
+  }
+  
+  const setCurrentCollapsedChildren = () => {
+    'worklet';
+    currentCollapsedChildren.value = itemCollapseChildren.value.map((v,i) => v === true ? i : undefined).filter(v => v!==undefined)
+  };
+
 
   const collapse = useCallback((index: number) => {
     'worklet';
-
-    // Toggle collapse state for parent
+  
+    // Get children indices and check if item has children
+    const childrenIndices = findChildrenIndices(index);
+    const hasChildren = childrenIndices.length > 0;
+  
+    if (!hasChildren) return;
+  
+    // Step 1: Toggle collapse state for parent
+    const newItemCollapse = [...itemCollapse.value];
+    newItemCollapse[index] = !newItemCollapse[index];
+    itemCollapse.value = newItemCollapse;
+  
+    // Step 2: Recompute all collapsed children
+    const allCollapsedChildren = new Set<number>();
     
-
-    // ** TODO: handle no children situation
-    // ** TODO: handle when switch index, the move of index
-    // ** TODO: handle when children is moved out of the parent, parent turn to false
-    // ** TODO: give context to consumer outside, to let them animated their chervon isCollapsed indication and number of children
+    // For each collapsed parent, add all its children to the set
+    itemCollapse.value.forEach((isCollapsed, parentIdx) => {
+      if (isCollapsed) {
+        const children = findChildrenIndices(parentIdx);
+        children.forEach(childIdx => {
+          allCollapsedChildren.add(childIdx);
+        });
+      }
+    });
+  
+    // Step 3: Update collapse children state
+    const newItemCollapseChildren = [...itemCollapseChildren.value];
+    itemCollapseChildren.value.forEach((_, idx) => {
+      newItemCollapseChildren[idx] = allCollapsedChildren.has(idx);
+    });
+    itemCollapseChildren.value = newItemCollapseChildren;
+  
+    // Step 4: Update tracking arrays for current state
+    // Track collapsed parents
+    currentCollapsed.value = itemCollapse.value
+      .map((v, i) => v ? i : undefined)
+      .filter((v): v is number => v !== undefined);
     
-    // // Get all children indices for the clicked item
-    const childrenIndices = findChildrenIndices(index, data);
-    const haveChildren = childrenIndices.length > 0
-
-    if (haveChildren){
-      itemCollapse.value[index] = !itemCollapse.value[index];
-      toggleCollapseNodes(index)
-      recomputeCollapsedChildren()
-    }
-
-    
-    
-    // Notify parent component
+    // Track collapsed children
+    currentCollapsedChildren.value = [...allCollapsedChildren];
+  
+    // Step 5: Notify parent component
     if (onCollapse) {
       runOnJS(onCollapse)({ 
         index, 
         childrenIndices, 
-        allCollapsedChildren: collapsedChildren.value });
+        allCollapsedChildren: currentCollapsedChildren.value 
+      });
     }
-
-
-  }, [data, itemCollapse, onCollapse]);
+  }, []);
 
 
   const reorder = (fromIndex: number, toIndex: number, groupIndices: number[]) => {
@@ -528,28 +703,29 @@ export const useReorderableListCore = <T>({
   const recomputeLayout = useCallback(
     (from: number, to: number) => {
       'worklet';
+      const UPDATE_C = false
+      
       // everytime is one step ****
       const length = currentIndices.value.length;
       const itemDirection = to > from;
       const distance = Math.abs(to - from);
 
       if (itemDirection) {
+        console.log({to, from})
         // go down
 
         /* GET */
         // item being moved
-        // const newHOther = itemHeight.value[from+length];
-        // const newTOther = itemOffset.value[from];
-        // const newCOther = itemCollapse.value[from+length]; // **CHECK
-        
         let sumLastTOthers = itemOffset.value[from];
         let newHOthers = [];
         let newTOthers = [];
         let newCOthers = [];
+        let newCCOthers = [];
         for (let i=0; i<distance; i++){
           newHOthers[i] = itemHeight.value[from+length+i];
           newTOthers[i] = sumLastTOthers;
           newCOthers[i] = itemCollapse.value[from+length+i];
+          newCCOthers[i] = itemCollapseChildren.value[from+length+i];
           sumLastTOthers += newHOthers[i];
         }
         
@@ -558,31 +734,32 @@ export const useReorderableListCore = <T>({
         let newH = [];
         let newT = [];
         let newC = [];
+        let newCC = [];
         for (let i=0; i<length; i++){
-          console.log({sumLastTOthers})
           newH[i] = itemHeight.value[from+i];
-          // newT[i] = itemOffset.value[from]+itemHeight.value[from+length]+sumLastHs;
           newT[i] = sumLastTOthers+sumLastHs;
           newC[i] = itemCollapse.value[from+i];
+          newCC[i] = itemCollapseChildren.value[from+i];
           sumLastHs = newH[i] + sumLastHs;
         }
-
+// console.log({newC})
         /* SET */
         // item being moved
-        // itemHeight.value[to-1] = newHOther;
-        // itemOffset.value[to-1] = newTOther;
-        // itemCollapse.value[to-1] = newCOther;
         for (let i=0; i<distance; i++){
           itemHeight.value[from+i] = newHOthers[i];
           itemOffset.value[from+i] = newTOthers[i];
+          if (!UPDATE_C) continue
           itemCollapse.value[from+i] = newCOthers[i];
+          itemCollapseChildren.value[from+i] = newCCOthers[i];
         }
    
         // drag items
         for (let i=0; i<length; i++){           
           itemHeight.value[to+i] = newH[i];
           itemOffset.value[to+i] = newT[i];
+          if (!UPDATE_C) continue
           itemCollapse.value[to+i] = newC[i];
+          itemCollapseChildren.value[to+i] = newCC[i];
         }
         
       } else {
@@ -590,18 +767,16 @@ export const useReorderableListCore = <T>({
 
          /* GET */
         // item being moved
-        // const newHOther = itemHeight.value[to];
-        // const newTOther = itemOffset.value[to]+draggedHeight.value;
-        // const newCOther = itemCollapse.value[to];
-
         let sumLastTOthers = itemOffset.value[to]+draggedHeight.value;
         let newHOthers = [];
         let newTOthers = [];
         let newCOthers = [];
+        let newCCOthers = [];
         for (let i=0; i<distance; i++){
           newHOthers[i] = itemHeight.value[to+i];
           newTOthers[i] = sumLastTOthers;
           newCOthers[i] = itemCollapse.value[to+i];
+          newCCOthers[i] = itemCollapseChildren.value[to+i];
           sumLastTOthers += newHOthers[i]; 
         }
 
@@ -610,10 +785,12 @@ export const useReorderableListCore = <T>({
         let newH = [];
         let newT = [];
         let newC = [];
+        let newCC = [];
         for (let i=0; i<length; i++){
           newH[i] = itemHeight.value[from+i];
           newT[i] = itemOffset.value[to]+sumLastHs;
           newC[i] = itemCollapse.value[from+i];
+          newCC[i] = itemCollapseChildren.value[from+i];
           sumLastHs = newH[i] + sumLastHs;
         }
 
@@ -622,28 +799,251 @@ export const useReorderableListCore = <T>({
         for (let i=0; i<length; i++){           
           itemHeight.value[to+i] = newH[i];
           itemOffset.value[to+i] = newT[i];
+          if (!UPDATE_C) continue
           itemCollapse.value[to+i] = newC[i];
+          itemCollapseChildren.value[to+i] = newCC[i];
         }
         
         // item being moved
-        // itemHeight.value[to+length] = newHOther;
-        // itemOffset.value[to+length] = newTOther;
-        // itemCollapse.value[to+length] = newCOther;
         for (let i=0; i<distance; i++){
           itemHeight.value[to+length+i] = newHOthers[i];
           itemOffset.value[to+length+i] = newTOthers[i];
+          if (!UPDATE_C) continue
           itemCollapse.value[to+length+i] = newCOthers[i];
+          itemCollapseChildren.value[to+length+i] = newCCOthers[i];
         }
         
-        
-        
       }
+      if (!UPDATE_C) return
+    itemCollapse.value = [...itemCollapse.value]
+    itemCollapseChildren.value = [...itemCollapseChildren.value]
+    setCurrentCollapsed()
+    setCurrentCollapsedChildren()
+    // recomputeCollapse(from,to)
     },
     [itemOffset, itemHeight, itemCollapse],
   );
 
-  
+  const recomputeCollapse = useCallback(
+    (from: number, to: number) => {
+      'worklet';
 
+      const length = currentIndices.value.length;
+      const itemDirection = to > from;
+      const distance = Math.abs(to - from);
+      
+        console.log({to, from})
+
+      if (itemDirection) {
+        // go down
+
+        /* GET */
+        // item being moved
+        let newCOthers = [];
+        let newCCOthers = [];
+        for (let i=0; i<distance; i++){
+          newCOthers[i] = itemCollapse.value[from+length+i];
+          newCCOthers[i] = itemCollapseChildren.value[from+length+i];
+        }
+        
+        // drag items
+        let newC = [];
+        let newCC = [];
+        for (let i=0; i<length; i++){
+          newC[i] = itemCollapse.value[from+i];
+          newCC[i] = itemCollapseChildren.value[from+i];
+        }
+
+        /* SET */
+        // item being moved
+        for (let i=0; i<distance; i++){
+          itemCollapse.value[from+i] = newCOthers[i];
+          itemCollapseChildren.value[from+i] = newCCOthers[i];
+        }
+   
+        // drag items
+        for (let i=0; i<length; i++){           
+          itemCollapse.value[to+i] = newC[i];
+          itemCollapseChildren.value[to+i] = newCC[i];
+        }
+        
+      } else {
+        // go up
+
+         /* GET */
+        // item being moved
+        let newCOthers = [];
+        let newCCOthers = [];
+        for (let i=0; i<distance; i++){
+          newCOthers[i] = itemCollapse.value[to+i];
+          newCCOthers[i] = itemCollapseChildren.value[to+i];
+        }
+
+        // drag items
+        let newC = [];
+        let newCC = [];
+        for (let i=0; i<length; i++){
+          newC[i] = itemCollapse.value[from+i];
+          newCC[i] = itemCollapseChildren.value[from+i];
+        }
+
+         /* SET */
+        // drag items
+        for (let i=0; i<length; i++){           
+          itemCollapse.value[to+i] = newC[i];
+          itemCollapseChildren.value[to+i] = newCC[i];
+        }
+        
+        // item being moved
+        for (let i=0; i<distance; i++){
+          itemCollapse.value[to+length+i] = newCOthers[i];
+          itemCollapseChildren.value[to+length+i] = newCCOthers[i];
+        }
+        
+      }
+    setCurrentCollapsed()
+    setCurrentCollapsedChildren()
+    // const map = itemCollapse.value.map((v,i)=>[v,itemCollapseChildren.value[i]])
+    // console.log(map)
+    },
+    [itemCollapse],
+  );
+
+  /**
+ * Calculates the next possible index for a dragged item based on its current position and movement direction
+ * 
+ * @param direction - Movement direction ('same', 'up', or 'down')
+ * @param displacement - Whether item is being moved 'above' or 'below' current position
+ * @param currentIndex - Current index of the dragged item
+ * @param currentChildrenSize - Number of children the dragged item has
+ * @returns The calculated target indices for item movement
+ */
+const calculateTargetIndices = (
+  direction: 'same' | 'up' | 'down',
+  displacement: 'above' | 'below',
+  currentIndex: number,
+  currentChildrenSize: number
+) => {
+  'worklet';
+  
+  // Calculate base indices based on movement direction
+  const indices = {
+    above: -1,
+    below: -1
+  };
+
+  switch(direction) {
+    case 'same':
+      indices.above = currentIndex - 1;
+      indices.below = currentIndex + 1 + currentChildrenSize;
+      break;
+    case 'up':
+      indices.above = currentIndex - 1;
+      indices.below = currentIndex;
+      break;
+    case 'down':
+      indices.above = currentIndex + currentChildrenSize;
+      indices.below = currentIndex + 1 + currentChildrenSize;
+      break;
+  }
+
+  return indices[displacement];
+};
+
+/**
+ * Calculates step size for movement when dealing with collapsed groups
+ * 
+ * @param direction - Movement direction ('same', 'up', or 'down')
+ * @param displacement - Whether moving 'above' or 'below'
+ * @param params - Object containing indices and group info
+ * @returns Calculated step size
+ */
+const calculateStepSize = (
+  direction: 'same' | 'up' | 'down',
+  displacement: 'above' | 'below',
+  params: {
+    currentIndex: number,
+    currentChildrenSize: number,
+    parentIndex: number,
+    lastChildren: number
+  }
+) => {
+  'worklet';
+  
+  const { currentIndex, currentChildrenSize, parentIndex, lastChildren } = params;
+
+  if (parentIndex === -1) return 1;
+
+  switch(direction) {
+    case 'same':
+      return displacement === 'above'
+        ? Math.abs(parentIndex - currentIndex)
+        : Math.abs(lastChildren - currentIndex - currentChildrenSize);
+      
+    case 'up':
+      return displacement === 'above'
+        ? Math.abs(parentIndex - currentIndex)
+        : Math.abs(lastChildren + 1 - currentIndex);
+      
+    case 'down':
+      return displacement === 'above'
+        ? Math.abs(parentIndex - (currentIndex + 1) - currentChildrenSize)
+        : Math.abs(lastChildren - currentIndex - currentChildrenSize);
+      
+    default:
+      return 1;
+  }
+};
+
+  /**
+   * Computes the next index position for a dragged item, handling complex scenarios including:
+   * - Variable item heights
+   * - Nested collapsible groups
+   * - Multi-item drag groups (parent + children)
+   * 
+   * Key Concepts:
+   * 1. Drag Position
+   *    - Uses relative position accounting for scroll offset
+   *    - Compares against item center points for threshold detection
+   *    - Handles both upward and downward movements
+   * 
+   * 2. Movement Types
+   *    - 'same': Item hasn't crossed other items yet
+   *    - 'up': Moving towards top of list
+   *    - 'down': Moving towards bottom of list
+   * 
+   * 3. Displacement Types
+   *    - 'above': Drag point is above item center
+   *    - 'below': Drag point is below item center
+   * 
+   * 4. Step Size Calculation
+   *    - Basic: 1 step (single position)
+   *    - Collapse Groups: Variable steps based on group structure
+   *      - Parent movement: Considers all children
+   *      - Child movement: Considers parent boundaries
+   * 
+   * 5. Index Translation
+   *    - Real-time currentIndex updates as items move
+   *    - Other items maintain original indices + translation offset
+   *    - Special handling for collapse group boundaries
+   * 
+   * Example Scenarios:
+   * 1. Moving Down (direction: 'down')
+   *    - Above threshold: targetIndex = currentIndex
+   *    - Below threshold: targetIndex = currentIndex + 1 + childrenSize
+   * 
+   * 2. Moving Up (direction: 'up')
+   *    - Above threshold: targetIndex = currentIndex - 1
+   *    - Below threshold: targetIndex = currentIndex
+   * 
+   * 3. Collapse Group Movement
+   *    - Parent: Moves as single unit with children
+   *    - Children: Constrained within parent boundaries
+   *    - Step size adjusts based on group structure
+   * 
+   * @returns The computed target index for the dragged item
+   * @worklet
+   */
   const computeCurrentIndex = useCallback(() => {
     'worklet';
 
@@ -651,128 +1051,68 @@ export const useReorderableListCore = <T>({
       return currentIndex.value;
     }
 
+    // Calculate relative drag position
     const relativeDragCenterY =
       flatListScrollOffsetY.value +
       scrollViewDragScrollTranslationY.value +
       currentItemDragCenterY.value;
 
+    // Get current item metrics
     const currentOffset = itemOffset.value[currentIndex.value];
     const currentHeight = itemHeight.value[currentIndex.value];
     const currentCenter = currentOffset + currentHeight * 0.5;
+    const currentChildrenSize = findChildrenIndices(draggedIndex.value).length
 
-    // find possible index range
-    const max = itemOffset.value.length;
-    const minIndex = 0;
-    const maxIndex = max - 1 - (currentIndices.value.length - 1);
-    console.log({itemOffset:itemOffset.value})
-    console.log({currentIndex:currentIndex.value,currentOffset, relativeDragCenterY, currentCenter})
-    const direction = relativeDragCenterY < currentCenter ? 'up' : 'down'
-    // let possibleIndex;
+    // Determine movement direction and displacement
+    const direction = draggedIndex.value === currentIndex.value ? 'same' : draggedIndex.value > currentIndex.value ? 'up' : 'down'
+    const displacement = relativeDragCenterY < currentCenter ? 'above' : 'below'
 
-     // Helper function to check if an index is a child of any item
-    const isChildOfAny = (index: number) => {
-      'worklet';
-      for (let i = 0; i < data.length; i++) {
-        if (i === index) continue;
-        const children = findChildrenIndices(i, data);
-        if (children.includes(index)) return true;
-      }
-      return false;
-    };
+    // Calculate target index
+    const targetIndex = calculateTargetIndices(
+      direction, 
+      displacement, 
+      currentIndex.value, 
+      currentChildrenSize
+    );
 
-    // Helper function to find next valid index
-    const findNextValidIndex = (startIndex: number, searchDirection: 'up' | 'down') => {
-      'worklet';
-      const step = searchDirection === 'up' ? -1 : 1;
-      let idx = startIndex;
-  
-      while (idx >= minIndex && idx <= maxIndex) {
-        // Skip if index is a child of any item
-        if (!isChildOfAny(idx) && !collapsedChildren.value.includes(idx)) {
-          return idx;
-        }
-        idx += step;
-      }
-      return startIndex; // Return original if no valid index found
-    };
-
-    const isInsideCollapsedGroup = (index: number): { isInside: boolean; collapsedTree: number[] } => {
-      'worklet';
-      
-      let collapsedTree: number[] = [];
-      
-      // Check if the index itself is a collapsed node
-      if (collapsedNodes.value.includes(index)) {
-        // Get all children of this collapsed node
-        const children = findChildrenIndices(index, data);
-        collapsedTree = [index, ...children];
-        return { isInside: true, collapsedTree };
-      }
-      
-      // Check if the index is a collapsed child
-      if (collapsedChildren.value.includes(index)) {
-        // Find the parent collapsed node
-        for (const nodeIndex of collapsedNodes.value) {
-          const children = findChildrenIndices(nodeIndex, data);
-          if (children.includes(index)) {
-            collapsedTree = [nodeIndex, ...children];
-            return { isInside: true, collapsedTree };
-          }
-        }
-      }
-      
-      // Check if the index is within any collapsed node's children range
-      for (const nodeIndex of collapsedNodes.value) {
-        // Only check nodes before our target index
-        if (nodeIndex < index) {
-          const children = findChildrenIndices(nodeIndex, data);
-          const lastChildIndex = nodeIndex + children.length;
-          
-          // If our index falls within this collapsed node's range
-          if (index > nodeIndex && index <= lastChildIndex) {
-            collapsedTree = [nodeIndex, ...children];
-            return { isInside: true, collapsedTree };
-          }
-        }
-      }
-      
-      return { isInside: false, collapsedTree: [] };
-    };
-
-    // if next item is in collapsed group, update the step size,
-    // to calculate the possible index
-    let STEP_SIZE = 1;
-    
-    const upIndex = Math.max(minIndex, currentIndex.value - 1);
-    const downIndex = Math.min(maxIndex, currentIndex.value + 1);
-
-    const {isInside, collapsedTree} = isInsideCollapsedGroup(direction === 'up' ? upIndex : downIndex)
-    STEP_SIZE = isInside ? collapsedTree.length : 1;
-
-    let possibleIndex = 
-      relativeDragCenterY < currentCenter
-        ? Math.max(minIndex, currentIndex.value - STEP_SIZE)
-        : Math.min(maxIndex, currentIndex.value + STEP_SIZE);
-    
-    // console.log({STEP_SIZE, possibleIndex,collapsedTree})
-
-    // console.log({possibleIndex,currentCenter,relativeDragCenterY})
-
-    // need to according to STEP SIZE, update the threshold 
+    // Get collapse group info and calculate step size
+    const { parentIndex, children } = getCollapseGroupInfo(targetIndex);
+    const lastChildren = parentIndex !== -1 
+      ? Math.max(...children)
+      : undefined;
+  // console.log({parentIndex, children})
+    let stepSize = calculateStepSize(direction, displacement, {
+      currentIndex: currentIndex.value,
+      currentChildrenSize,
+      parentIndex,
+      lastChildren
+    });
+  // stepSize = 1
+    // Calculate possible index within bounds
+    const possibleIndex = displacement === 'above'
+      ? Math.max(
+          0, 
+          currentIndex.value - stepSize
+      )
+      : Math.min(
+          itemOffset.value.length - 1 - currentIndices.value.length + 1,
+          currentIndex.value + stepSize
+        );
+ 
+    // Determine final index based on distances
     if (currentIndex.value !== possibleIndex) {
       let possibleOffset = itemOffset.value[possibleIndex];
       if (possibleIndex > currentIndex.value) { //down
         possibleOffset += itemHeight.value[possibleIndex] - currentHeight;
       }
-
-      // threshold for when to move to the possible index
+      
       const possibleCenter = possibleOffset + currentHeight * 0.5;
       const distanceFromCurrent = Math.abs(relativeDragCenterY - currentCenter);
       const distanceFromPossible = Math.abs(
         relativeDragCenterY - possibleCenter,
       );
 
-      // console.log({distanceFromCurrent,distanceFromPossible})
+    
       return distanceFromCurrent <= distanceFromPossible
         ? currentIndex.value
         : possibleIndex;
@@ -808,10 +1148,8 @@ export const useReorderableListCore = <T>({
 
     if (currentIndex.value !== newIndex) {
       recomputeLayout(currentIndex.value, newIndex);
-
       currentIndex.value = newIndex;
 
-      console.log(collapsedChildren.value, newIndex)
       runOnJS(triggerSelectionHaptic)();
 
       onIndexChange?.({index: newIndex});
@@ -934,7 +1272,10 @@ export const useReorderableListCore = <T>({
             : -displacedHeight
          
         runDefaultDragAnimations('end');
-        
+
+        // Update the collapse and collapse children
+        recomputeCollapse(draggedIndex.value, currentIndex.value)
+      
         // Animate to final position
         if (dragY.value !== newTopPosition) {
           
@@ -952,6 +1293,9 @@ export const useReorderableListCore = <T>({
         } else {
           runOnJS(resetSharedValuesAfterAnimations)();
         }
+    
+
+        
       }
     },
   );
@@ -1096,6 +1440,7 @@ export const useReorderableListCore = <T>({
       ) {
         // Update item position index
         setCurrentIndex();
+       
         // setCurrentIndices();
 
         // Check if we should trigger autoscroll
@@ -1213,7 +1558,7 @@ export const useReorderableListCore = <T>({
         resetSharedValues();
 
         // calculate active item + children 's height
-        const childrenIndices = findChildrenIndices(index, data)
+        const childrenIndices = findChildrenIndices(index)
         const totalHeights = [index, ...childrenIndices]
                               .map(i=> itemHeight.value[i])
                               .reduce((height,sum) => sum + height, 0);
@@ -1295,6 +1640,7 @@ export const useReorderableListCore = <T>({
     itemOffset,
     itemHeight,
     itemCollapse,
+    itemCollapseChildren,
     draggedIndex,
     draggedIndices,
     dragY,

@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useMemo, useEffect} from 'react';
 import {
   CellRendererProps,
   FlatList,
@@ -81,6 +81,7 @@ const ReorderableListCore = <T,>(
     itemOffset,
     itemHeight,
     itemCollapse,
+    itemCollapseChildren,
     dragY,
     draggedIndex,
     draggedIndices,
@@ -140,6 +141,7 @@ const ReorderableListCore = <T,>(
         itemOffset={itemOffset}
         itemHeight={itemHeight}
         itemCollapse={itemCollapse}
+        itemCollapseChildren={itemCollapseChildren}
         dragY={dragY}
         draggedIndex={draggedIndex}
         draggedIndices={draggedIndices}
@@ -148,7 +150,7 @@ const ReorderableListCore = <T,>(
         startDrag={startDrag}
       />
     ),
-    [itemOffset, itemHeight, itemCollapse, dragY, draggedIndex, draggedIndices, duration, collapse, startDrag],
+    [itemOffset, itemHeight, itemCollapse, itemCollapseChildren, dragY, draggedIndex, draggedIndices, duration, collapse, startDrag],
   );
 
   return (

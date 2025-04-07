@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo, useRef } from 'react';
 import { CellRendererProps, LayoutChangeEvent,View, Text, TextInput } from 'react-native';
 import { ReText}  from 'react-native-redash';
 
@@ -47,6 +47,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     itemOffset,
     itemHeight,
     itemCollapse,
+    itemCollapseChildren,
     dragY,
     draggedIndex,
     draggedIndices,
@@ -55,8 +56,11 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     data
   } = props;
 
-  const { currentIndex, currentIndices, collapsedNodes, collapsedChildren, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
+  const { currentIndex, currentIndices, currentCollapsed, currentCollapsedChildren, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
     useContext(ReorderableListContext);
+
+  const isCollapseRef = useRef(false);
+  const isCollapseChildrenRef = useRef(false);
     
   const dragHandler = useCallback(
     () => runOnUI(startDrag)(index),
@@ -64,28 +68,30 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   );
 
   const collapseHandler = useCallback(
-    () => runOnUI(collapse)(index),
+    () => {
+      runOnUI(collapse)(index);
+    },
     [collapse, index],
   );
 
   const isActive = activeIndex === index;
   const isActiveChildren = activeIndices.includes(index) && !isActive;
   const isCollapsed = itemCollapse.value[index]
-  const isCollapsedChildren = itemCollapse.value.includes(index) && !isCollapsed;
+  const iscurrentCollapsedChildren = itemCollapse.value.includes(index) && !isCollapsed;
 
   const contextValue = useMemo(
     () => ({
       index,
       collapseHandler,
       isCollapsed,
-      isCollapsedChildren,
+      iscurrentCollapsedChildren,
       dragHandler,
       draggedIndex,
       draggedIndices,
       isActive,
       isActiveChildren
     }),
-    [index, collapseHandler, isCollapsed, isCollapsedChildren, dragHandler, draggedIndex, draggedIndices, isActive, isActiveChildren],
+    [index, collapseHandler, isCollapsed, iscurrentCollapsedChildren, dragHandler, draggedIndex, draggedIndices, isActive, isActiveChildren],
   );
 
   // Calculate indentation based on depth
@@ -101,8 +107,10 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   const isActiveCells = useDerivedValue(() => draggedIndices.value.includes(index))
   
   const height = useDerivedValue(() => itemHeight.value[index])
-  const isCollapsedCell = useDerivedValue(() => collapsedNodes.value.includes(index))
-  const isCollapsedChildrenCells = useDerivedValue(() => collapsedChildren.value.includes(index))
+  const isCollapse = useDerivedValue(() => itemCollapse.value[index])
+  const isCollapseChildren = useDerivedValue(() => itemCollapseChildren.value[index])
+  const isCollapsedCell = useDerivedValue(() => currentCollapsed.value.includes(index))
+  const isCollapsedChildrenCell = useDerivedValue(() => currentCollapsedChildren.value.includes(index))
 
   useAnimatedReaction(
     () => dragY.value,
@@ -148,18 +156,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     },
   );
 
-  useAnimatedReaction(
-    () => collapsedChildren.value,
-    (current) => {
-      // Update the local itemCollapse and height value
-      isCollapsedChildrenCells.value = current.includes(index);
-
-      // height.value = withTiming(isCollapsedChildrenCells.value ? 0 : itemHeight.value[index], {
-      //       duration: animationDuration.value,
-      //       easing: Easing.out(Easing.ease),
-      //     });
-    },
-  )
+ 
 
   const animatedStyle = useAnimatedStyle(() => {
     
@@ -194,12 +191,15 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     };
   });
 
+
   const handleLayout = (e: LayoutChangeEvent) => {
     runOnUI((y: number, height: number) => {
       itemOffset.value[index] = y;
       itemHeight.value[index] = height;
-      itemCollapse.value[index] = false
-
+     
+      itemCollapse.value[index] = itemCollapse.value[index] ?? false 
+      itemCollapseChildren.value[index] = itemCollapseChildren.value[index] ?? false 
+     
     })(e.nativeEvent.layout.y, e.nativeEvent.layout.height);
 
     // Update the local height value on first render
@@ -212,10 +212,16 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   const dIndex = useDerivedValue(() => `index: ${index}`);
   const dHeight = useDerivedValue(() => `h: ${itemHeight.value[index]?.toString()}`);
   const dTop = useDerivedValue(() => `top: ${itemOffset.value[index]?.toString()}`);
-  const dCollapsed = useDerivedValue(() => `collapse: ${isCollapsedCell.value?.toString()}`);
+  const dItemCollapse= useDerivedValue(() => `c: ${isCollapse.value?.toString()}`);
+  const dItemCC = useDerivedValue(() => `CC: ${isCollapseChildren.value?.toString()}`);
+  const dCollapsed = useDerivedValue(() => `currC: ${isCollapsedCell.value?.toString()}`);
+  const dCollapsedChildren = useDerivedValue(() => `currCC: ${isCollapsedChildrenCell.value?.toString()}`);
+  const dCollapsedRef = useDerivedValue(() => `cRef: ${isCollapseRef.current?.toString()}`);
+  const dCollapsedChildrenRef = useDerivedValue(() => `ccRef: ${isCollapseChildrenRef.current?.toString()}`);
 
  Animated.addWhitelistedNativeProps({ text: true });
-  const debugTextStyle = {fontSize:12, color:'blue', fontWeight:'600'}
+  const debugTextStyle = {fontSize:12, color:'blue', fontWeight:'600', minWidth:100}
+  const debugTextStyle2 = {fontSize:12, color:'red', fontWeight:'600', minWidth:100}
 
  
   return (
@@ -227,13 +233,19 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
           right:8,
           zIndex:1000,
           alignItems:'flex-end',
-          width:100,
+          width:180,
+      backgroundColor: '#fff'
         }}>
           <ReText text={dCurrentIndex} style={debugTextStyle}/>
           <ReText text={dIndex} style={debugTextStyle}/>
           <ReText text={dHeight} style={debugTextStyle}/>
           <ReText text={dTop} style={debugTextStyle}/>
-          <ReText text={dCollapsed} style={debugTextStyle}/>
+          {/* <ReText text={dCollapsedRef} style={debugTextStyle2}/>
+          <ReText text={dCollapsedChildrenRef} style={debugTextStyle2}/> */}
+          <ReText text={dItemCollapse} style={debugTextStyle2}/>
+          <ReText text={dItemCC} style={debugTextStyle2}/>
+          <ReText text={dCollapsed} style={debugTextStyle2}/>
+          <ReText text={dCollapsedChildren} style={debugTextStyle2}/>
         </View>
         {children}
       </Animated.View>

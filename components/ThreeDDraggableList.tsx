@@ -34,13 +34,13 @@ const getItemDepth = (item: Item, data: Item[]): number => {
 const getRandomHeight = () => Math.round(Math.random() * 100) + 40
 
 const initialData: Item[] = [
-  { id: '1', title: 'Project Documentation', parentId: null, description: getRandomDescription() , height: 40 },
-  { id: '2', title: 'Getting Started Guide', parentId: '1', description: getRandomDescription() , height: 45 },
-  { id: '3', title: 'Installation Steps', parentId: '2', description: getRandomDescription() , height: 76 },
-  { id: '4', title: 'Configuration', parentId: '2', description: getRandomDescription() , height: 73 },
-  { id: '5', title: 'API Reference', parentId: '1', description: getRandomDescription() , height: 122 },
-  { id: '6', title: 'Endpoints', parentId: '5', description: getRandomDescription() , height: 133 },
-  { id: '7', title: 'Authentication', parentId: '5', description: getRandomDescription() , height: 109 },
+  { id: '1', title: 'Project Documentation', parentId: null, description: getRandomDescription() , height: getRandomHeight() },
+  { id: '2', title: 'Getting Started Guide', parentId: '1', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '3', title: 'Installation Steps', parentId: '2', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '4', title: 'Configuration', parentId: '2', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '5', title: 'API Reference', parentId: '1', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '6', title: 'Endpoints', parentId: '5', description: getRandomDescription() , height: getRandomHeight() },
+  { id: '7', title: 'Authentication', parentId: '5', description: getRandomDescription() , height: getRandomHeight() },
   { id: '8', title: 'Development Tools', parentId: null, description: getRandomDescription() , height: getRandomHeight() },
   { id: '9', title: 'Code Editor Setup', parentId: '8', description: getRandomDescription() , height: getRandomHeight() },
   { id: '10', title: 'Extensions', parentId: '9', description: getRandomDescription() , height: getRandomHeight() },
@@ -64,7 +64,7 @@ const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
   return (
     <Pressable onPress={collapse} onLongPress={drag} style={[styles.item, {height:item.height}]}>
       <Text style={styles.title}>
-        {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.title} h:{item.height}
+        {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.id} {item.title} h:{item.height}
       </Text>
       <Text style={styles.description}>{item.description}</Text>
     </Pressable>
@@ -87,7 +87,7 @@ export default function ThreeDDraggableList() {
       removedItems.reverse().forEach((item, i) => {
         newData.splice(toIndices[i], 0, item);
       });
-  
+ 
       return newData;
     });
   };
