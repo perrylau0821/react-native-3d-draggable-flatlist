@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, Pressable, View } from 'react-native';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { ChevronDown } from 'lucide-react-native';
 import ReorderableList, {
   ReorderableListReorderEvent,
   useReorderableDrag,
@@ -56,17 +58,52 @@ const initialData: Item[] = [
   { id: '20', title: 'E2E Testing', parentId: '17', description: getRandomDescription() , height: getRandomHeight() },
 ];
 
+const ChevronIcon = () => {
+  const { isCollapsed, nodeType } = useCollapsible();
+ 
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      // alignSelf: 'flex-start',
+      transform: [{
+        rotateZ: withSpring(
+          isCollapsed.value ? '-90deg' : '0deg',
+          {
+            damping: 20,
+            stiffness: 300
+          }
+        )
+      }]
+    };
+  });
+
+  // if (nodeType !== 'leaf')
+  return (
+    <Animated.View style={[styles.chevron, animatedStyle]}>
+     { nodeType !== 'leaf' && <ChevronDown size={24} color="#666" />}
+    </Animated.View>
+  );
+};
+
 const ListItem = React.memo(({ item, data }: { item: Item; data: Item[] }) => {
   const drag = useReorderableDrag();
-  const collapse = useCollapsible();
+  const {collapse, isCollapsed} = useCollapsible();
   const depth = getItemDepth(item, data);
 
   return (
-    <Pressable onPress={collapse} onLongPress={drag} style={[styles.item, {height:item.height}]}>
-      <Text style={styles.title}>
-        {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'} {item.id} {item.title} h:{item.height}
-      </Text>
-      <Text style={styles.description}>{item.description}</Text>
+     <Pressable 
+       onPress={false ? collapse : () => {}} 
+       onLongPress={drag} 
+       style={[styles.item]}>
+      <View style={styles.contentRow}>
+        <ChevronIcon />
+        <View style={styles.textContent}>
+          <Text style={styles.title}>
+            {/* {depth === 0 ? '📁' : depth === 1 ? '📄' : '📎'}  */}
+            {item.id} {item.title} h:{item.height}
+          </Text>
+          <Text style={styles.description}>{item.description}</Text>
+        </View>
+      </View>
     </Pressable>
   );
 });
@@ -115,8 +152,22 @@ const styles = StyleSheet.create({
   item: {
     backgroundColor: 'white',
     padding: 16,
+    paddingLeft: 0,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  chevron: {
+    width: 32,
+    alignItems: 'center'
+    // marginRight: 8,
+    // marginTop: 2, // Align with text
+  },
+  textContent: {
+    flex: 1,
   },
   title: {
     fontSize: 16,

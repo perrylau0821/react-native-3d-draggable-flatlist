@@ -19,6 +19,7 @@ import Animated, {
 import { ReorderableCellContext, ReorderableListContext } from '../contexts';
 import { useContext } from '../hooks';
 import { applyAnimatedStyles } from './helpers';
+import { NodeType, getNodeType} from '../types';
 
 interface ReorderableListCellProps<T>
   extends Omit<CellRendererProps<T>, 'cellKey'> {
@@ -26,6 +27,7 @@ interface ReorderableListCellProps<T>
   startDrag: (index: number) => void;
   itemOffset: SharedValue<number[]>;
   itemHeight: SharedValue<number[]>;
+  itemMeasuredHeight: SharedValue<number[]>;
   itemCollapse: SharedValue<boolean[]>;
   dragY: SharedValue<number>;
   draggedIndex: SharedValue<number>;
@@ -33,7 +35,9 @@ interface ReorderableListCellProps<T>
   animationDuration: SharedValue<number>;
   item: T;
   data: T[];
+  nodeType?: NodeType;
 }
+
 
 export const ReorderableListCell = memo(function ReorderableListCell<T>(
   props: ReorderableListCellProps<T>
@@ -46,6 +50,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     onLayout,
     itemOffset,
     itemHeight,
+    itemMeasuredHeight,
     itemCollapse,
     itemCollapseChildren,
     dragY,
@@ -58,9 +63,6 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
 
   const { currentIndex, currentIndices, currentCollapsed, currentCollapsedChildren, draggedHeight, activeIndex, activeIndices, cellAnimations, depthExtractor, data: contextData } =
     useContext(ReorderableListContext);
-
-  const isCollapseRef = useRef(false);
-  const isCollapseChildrenRef = useRef(false);
     
   const dragHandler = useCallback(
     () => runOnUI(startDrag)(index),
@@ -76,22 +78,24 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
 
   const isActive = activeIndex === index;
   const isActiveChildren = activeIndices.includes(index) && !isActive;
-  const isCollapsed = itemCollapse.value[index]
-  const iscurrentCollapsedChildren = itemCollapse.value.includes(index) && !isCollapsed;
+  const isCollapsedCell = useDerivedValue(() => currentCollapsed.value.includes(index))
+  const isCollapsedChildrenCell = useDerivedValue(() => currentCollapsedChildren.value.includes(index))
+   const nodeType = useMemo(() => getNodeType(item, data), [item, data]);
 
   const contextValue = useMemo(
     () => ({
       index,
       collapseHandler,
-      isCollapsed,
-      iscurrentCollapsedChildren,
+      isCollapsed : isCollapsedCell,
+      isCollapsedChildren : isCollapsedChildrenCell,
       dragHandler,
       draggedIndex,
       draggedIndices,
       isActive,
-      isActiveChildren
+      isActiveChildren,
+      nodeType
     }),
-    [index, collapseHandler, isCollapsed, iscurrentCollapsedChildren, dragHandler, draggedIndex, draggedIndices, isActive, isActiveChildren],
+    [index, collapseHandler, isCollapsedCell.value, isCollapsedChildrenCell.value, dragHandler, draggedIndex, draggedIndices, isActive, isActiveChildren, nodeType],
   );
 
   // Calculate indentation based on depth
@@ -109,8 +113,7 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   const height = useDerivedValue(() => itemHeight.value[index])
   const isCollapse = useDerivedValue(() => itemCollapse.value[index])
   const isCollapseChildren = useDerivedValue(() => itemCollapseChildren.value[index])
-  const isCollapsedCell = useDerivedValue(() => currentCollapsed.value.includes(index))
-  const isCollapsedChildrenCell = useDerivedValue(() => currentCollapsedChildren.value.includes(index))
+  
 
   useAnimatedReaction(
     () => dragY.value,
@@ -156,6 +159,24 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     },
   );
 
+  useAnimatedReaction(
+    () => isCollapsedChildrenCell.value,
+    (isCollapsed) => {
+      console.log('here')
+      // Update height based on collapse state
+      height.value = withTiming(
+        isCollapsed 
+          ? 0 
+          : itemMeasuredHeight.value[index] || itemHeight.value[index] || 0, 
+        {
+          duration: animationDuration.value,
+          easing: Easing.out(Easing.ease),
+        });
+        
+        
+    },
+    [isCollapsedChildrenCell]
+  );
  
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -207,17 +228,23 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
     onLayout?.(e);
   };
 
+  const handleMeausreLayout = (e: LayoutChangeEvent) => {
+    runOnUI((height: number) => {
+            itemMeasuredHeight.value[index] = height;
+          })(e.nativeEvent.layout.height);
+   
+  };
+
   //  DEBUG
   const dCurrentIndex = useDerivedValue(() => `currIndex: ${currentIndex.value.toString()}`);
   const dIndex = useDerivedValue(() => `index: ${index}`);
-  const dHeight = useDerivedValue(() => `h: ${itemHeight.value[index]?.toString()}`);
-  const dTop = useDerivedValue(() => `top: ${itemOffset.value[index]?.toString()}`);
+  const dHeight = useDerivedValue(() => `h: ${itemHeight.value[index]?.toFixed(2).toString()}`);
+  const dTop = useDerivedValue(() => `top: ${itemOffset.value[index]?.toFixed(2).toString()}`);
   const dItemCollapse= useDerivedValue(() => `c: ${isCollapse.value?.toString()}`);
   const dItemCC = useDerivedValue(() => `CC: ${isCollapseChildren.value?.toString()}`);
   const dCollapsed = useDerivedValue(() => `currC: ${isCollapsedCell.value?.toString()}`);
   const dCollapsedChildren = useDerivedValue(() => `currCC: ${isCollapsedChildrenCell.value?.toString()}`);
-  const dCollapsedRef = useDerivedValue(() => `cRef: ${isCollapseRef.current?.toString()}`);
-  const dCollapsedChildrenRef = useDerivedValue(() => `ccRef: ${isCollapseChildrenRef.current?.toString()}`);
+
 
  Animated.addWhitelistedNativeProps({ text: true });
   const debugTextStyle = {fontSize:12, color:'blue', fontWeight:'600', minWidth:100}
@@ -227,13 +254,27 @@ export const ReorderableListCell = memo(function ReorderableListCell<T>(
   return (
    
     <ReorderableCellContext.Provider value={contextValue}>
+      {/* Hidden view for measuring full height */}
+      <View 
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          zIndex: -1,
+          width: '100%',
+          pointerEvents: 'none'
+        }}
+        onLayout={handleMeausreLayout}
+      >
+        {children}
+      </View>
+      
       <Animated.View style={animatedStyle} onLayout={handleLayout}>
         <View style={{
           position:'absolute',
           right:8,
           zIndex:1000,
           alignItems:'flex-end',
-          width:180,
+          // width:180,
       backgroundColor: '#fff'
         }}>
           <ReText text={dCurrentIndex} style={debugTextStyle}/>

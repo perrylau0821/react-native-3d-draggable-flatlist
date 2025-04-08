@@ -80,6 +80,7 @@ const ReorderableListCore = <T,>(
     listContextValue,
     itemOffset,
     itemHeight,
+    itemMeasuredHeight,
     itemCollapse,
     itemCollapseChildren,
     dragY,
@@ -140,6 +141,7 @@ const ReorderableListCore = <T,>(
         key={`${cellKey}+${props.index}`}
         itemOffset={itemOffset}
         itemHeight={itemHeight}
+        itemMeasuredHeight={itemMeasuredHeight}
         itemCollapse={itemCollapse}
         itemCollapseChildren={itemCollapseChildren}
         dragY={dragY}
@@ -150,7 +152,7 @@ const ReorderableListCore = <T,>(
         startDrag={startDrag}
       />
     ),
-    [itemOffset, itemHeight, itemCollapse, itemCollapseChildren, dragY, draggedIndex, draggedIndices, duration, collapse, startDrag],
+    [itemOffset, itemHeight, itemMeasuredHeight, itemCollapse, itemCollapseChildren, dragY, draggedIndex, draggedIndices, duration, collapse, startDrag],
   );
 
   return (

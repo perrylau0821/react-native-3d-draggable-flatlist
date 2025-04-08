@@ -139,6 +139,7 @@ export const useReorderableListCore = <T>({
   const draggedHeight = useSharedValue(0);
   const itemOffset = useSharedValue<number[]>([]);
   const itemHeight = useSharedValue<number[]>([]);
+  const itemMeasuredHeight = useSharedValue<number[]>([]);
   const itemCollapse = useSharedValue<boolean[]>([]);
   const itemCollapseChildren = useSharedValue<boolean[]>([]);
   const autoscrollTrigger = useSharedValue(-1);
@@ -670,6 +671,28 @@ export const useReorderableListCore = <T>({
       });
     }
   }, []);
+
+  useAnimatedReaction(
+    () => {
+      return currentCollapsedChildren.value
+      // Return an array of [index, isCollapsed] pairs that changed
+      // return itemCollapseChildren.value.map((isCollapsed, index) => [index, isCollapsed]);
+    },
+    (current, previous) => {
+      if (!previous) return;
+console.log(current, previous)
+      // current: all height zero
+      // current.forEach(index => itemHeight.value[index] = 0)
+      
+      // previous and not current: height back to original
+      // previous.forEach(index => {
+      //   if (!current.includes(index)){
+      //     itemHeight.value[index] = itemMeasuredHeight.value[index]
+      //   }
+      // })
+    },
+    [itemCollapseChildren, itemHeight, itemMeasuredHeight]
+  );
 
 
   const reorder = (fromIndex: number, toIndex: number, groupIndices: number[]) => {
@@ -1639,6 +1662,7 @@ const calculateStepSize = (
     listContextValue,
     itemOffset,
     itemHeight,
+    itemMeasuredHeight,
     itemCollapse,
     itemCollapseChildren,
     draggedIndex,
